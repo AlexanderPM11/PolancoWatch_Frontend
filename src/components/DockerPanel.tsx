@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Activity } from 'lucide-react';
+import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Activity, Terminal } from 'lucide-react';
+import Modal from './Modal';
+import { LogViewer } from './LogViewer';
 import type { DockerContainerMetrics, DockerStats } from '../hooks/useMetrics';
 import { dockerService } from '../services/api';
 
@@ -13,6 +15,7 @@ type FilterStatus = 'all' | 'running' | 'stopped' | 'failed';
 export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: globalStats }) => {
     const [filter, setFilter] = useState<FilterStatus>('all');
     const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+    const [selectedLogContainer, setSelectedLogContainer] = useState<{ id: string, name: string } | null>(null);
 
     const handleAction = async (id: string, action: 'start' | 'stop' | 'restart') => {
         setLoadingIds(prev => new Set(prev).add(id));
@@ -228,6 +231,13 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
                                         <RotateCcw size={10} />
                                         Restart
                                     </button>
+                                    <button 
+                                        onClick={() => setSelectedLogContainer({ id: container.containerId, name: container.name })}
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 transition-all text-[9px] font-black uppercase tracking-widest"
+                                    >
+                                        <Terminal size={10} />
+                                        Logs
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -241,6 +251,20 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
                     )}
                 </div>
             </div>
+
+            <Modal
+                isOpen={!!selectedLogContainer}
+                onClose={() => setSelectedLogContainer(null)}
+                title={`Container logs: ${selectedLogContainer?.name || ''}`}
+                type="info"
+            >
+                {selectedLogContainer && (
+                    <LogViewer 
+                        containerId={selectedLogContainer.id}
+                        containerName={selectedLogContainer.name}
+                    />
+                )}
+            </Modal>
         </div>
     );
 };
