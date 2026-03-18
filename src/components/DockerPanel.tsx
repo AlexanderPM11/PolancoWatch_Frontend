@@ -47,6 +47,11 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
         failed: containers?.filter(c => c.status.toLowerCase().includes('exit') && !c.status.includes('exit (0)')).length || 0
     };
 
+    // If no containers and no global stats (or all 0), don't show the panel
+    if (localStats.all === 0 && (!globalStats || globalStats.totalContainers === 0)) {
+        return null;
+    }
+
     const Tab = ({ id, label, count, icon: Icon }: { id: FilterStatus, label: string, count: number, icon: any }) => (
         <button
             onClick={() => setFilter(id)}
