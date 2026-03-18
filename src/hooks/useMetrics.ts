@@ -9,6 +9,15 @@ export interface DockerContainerMetrics {
     state: string;
     cpuPercentage: number;
     memoryUsageBytes: number;
+    networkIO: string;
+    blockIO: string;
+}
+
+export interface DockerStats {
+    totalContainers: number;
+    runningContainers: number;
+    stoppedContainers: number;
+    totalImages: number;
 }
 
 export interface ServerMetricsSnapshot {
@@ -19,6 +28,7 @@ export interface ServerMetricsSnapshot {
     systemInfo: any;
     topProcesses: any[];
     dockerContainers: DockerContainerMetrics[];
+    dockerStats: DockerStats;
     timestampUtc: string;
 }
 

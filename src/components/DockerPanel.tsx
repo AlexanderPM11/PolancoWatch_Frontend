@@ -1,87 +1,240 @@
-import React from 'react';
-import { Box, Activity, Cpu } from 'lucide-react';
-import type { DockerContainerMetrics } from '../hooks/useMetrics';
+import React, { useState } from 'react';
+import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Activity } from 'lucide-react';
+import type { DockerContainerMetrics, DockerStats } from '../hooks/useMetrics';
+import { dockerService } from '../services/api';
 
 interface DockerPanelProps {
     containers: DockerContainerMetrics[];
+    stats?: DockerStats; // Made optional for safety
 }
 
-export const DockerPanel: React.FC<DockerPanelProps> = ({ containers }) => {
+type FilterStatus = 'all' | 'running' | 'stopped' | 'failed';
+
+export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: globalStats }) => {
+    const [filter, setFilter] = useState<FilterStatus>('all');
+    const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+
+    const handleAction = async (id: string, action: 'start' | 'stop' | 'restart') => {
+        setLoadingIds(prev => new Set(prev).add(id));
+        try {
+            if (action === 'start') await dockerService.startContainer(id);
+            else if (action === 'stop') await dockerService.stopContainer(id);
+            else if (action === 'restart') await dockerService.restartContainer(id);
+        } catch (error) {
+            console.error(`Failed to ${action} container:`, error);
+            // Optionally add toast notification here
+        } finally {
+            setLoadingIds(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        }
+    };
+
+    const filteredContainers = (containers || []).filter(c => {
+        if (filter === 'all') return true;
+        if (filter === 'running') return c.state === 'running';
+        if (filter === 'stopped') return (c.state === 'exited' || c.state === 'created') && !c.status.toLowerCase().includes('exit (1)');
+        if (filter === 'failed') return c.status.toLowerCase().includes('exit') && !c.status.includes('exit (0)');
+        return true;
+    });
+
+    const localStats = {
+        all: containers?.length || 0,
+        running: containers?.filter(c => c.state === 'running').length || 0,
+        stopped: containers?.filter(c => (c.state === 'exited' || c.state === 'created') && !c.status.toLowerCase().includes('exit (1)')).length || 0,
+        failed: containers?.filter(c => c.status.toLowerCase().includes('exit') && !c.status.includes('exit (0)')).length || 0
+    };
+
+    const Tab = ({ id, label, count, icon: Icon }: { id: FilterStatus, label: string, count: number, icon: any }) => (
+        <button
+            onClick={() => setFilter(id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-300 border font-bold text-[10px] uppercase tracking-widest ${
+                filter === id 
+                    ? 'bg-brand-primary/20 border-brand-primary/40 text-white shadow-[0_0_15px_rgba(139,92,246,0.2)]' 
+                    : 'bg-white/2 border-white/5 text-slate-500 hover:bg-white/5 hover:text-slate-300'
+            }`}
+        >
+            <Icon size={14} className={filter === id ? 'text-brand-primary' : 'opacity-50'} />
+            {label}
+            <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[8px] ${
+                filter === id ? 'bg-brand-primary/30 text-white' : 'bg-white/10 text-slate-400'
+            }`}>
+                {count}
+            </span>
+        </button>
+    );
+
     return (
-        <div className="glass-card rounded-4xl p-8 border-white/5">
-            <div className="flex justify-between items-center mb-8">
-                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em] flex items-center gap-3">
-                    <Box size={18} className="text-brand-primary" /> Docker Containers
-                </h3>
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                    {containers?.length || 0} RUNNING
-                </span>
+        <div className="flex flex-col gap-8">
+            {/* Global Analytics Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="glass-card p-6 rounded-3xl border-white/5 flex items-center gap-4 bg-linear-to-br from-brand-primary/5 to-transparent">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 flex items-center justify-center border border-brand-primary/20">
+                        <Database size={20} className="text-brand-primary" />
+                    </div>
+                    <div>
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-tight">Total Containers</span>
+                        <h4 className="text-2xl font-black text-white leading-none mt-1">{globalStats?.totalContainers || localStats.all}</h4>
+                    </div>
+                </div>
+                <div className="glass-card p-6 rounded-3xl border-white/5 flex items-center gap-4 bg-linear-to-br from-brand-secondary/5 to-transparent">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-secondary/10 flex items-center justify-center border border-brand-secondary/20">
+                        <Activity size={20} className="text-brand-secondary" />
+                    </div>
+                    <div>
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-tight">Running</span>
+                        <h4 className="text-2xl font-black text-white leading-none mt-1">{globalStats?.runningContainers || localStats.running}</h4>
+                    </div>
+                </div>
+                <div className="glass-card p-6 rounded-3xl border-white/5 flex items-center gap-4 bg-linear-to-br from-brand-accent/5 to-transparent">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-accent/10 flex items-center justify-center border border-brand-accent/20">
+                        <AlertCircle size={20} className="text-brand-accent" />
+                    </div>
+                    <div>
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-tight">Stopped / Failed</span>
+                        <h4 className="text-2xl font-black text-white leading-none mt-1">{(globalStats?.stoppedContainers || localStats.stopped + localStats.failed)}</h4>
+                    </div>
+                </div>
+                <div className="glass-card p-6 rounded-3xl border-white/5 flex items-center gap-4 bg-linear-to-br from-white/5 to-transparent">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10">
+                        <Image size={20} className="text-slate-300" />
+                    </div>
+                    <div>
+                        <span className="text-[10px] text-slate-500 font-black uppercase tracking-tight">Total Images</span>
+                        <h4 className="text-2xl font-black text-white leading-none mt-1">{globalStats?.totalImages || 0}</h4>
+                    </div>
+                </div>
             </div>
 
-            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {containers?.map((container) => (
-                    <div 
-                        key={container.containerId} 
-                        className="p-5 rounded-2xl bg-white/2 border border-white/5 hover:bg-white/4 transition-all group relative overflow-hidden"
-                    >
-                        <div className="flex justify-between items-start mb-3 relative z-10">
-                            <div className="flex flex-col">
-                                <span className="text-xs font-black text-white uppercase tracking-wider truncate max-w-[180px]">
-                                    {container.name}
-                                </span>
-                                <span className="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">
-                                    {container.image}
-                                </span>
-                            </div>
-                            <div className="flex flex-col items-end">
-                                <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-tighter ${
-                                    container.state === 'running' 
-                                        ? 'bg-brand-secondary/10 text-brand-secondary border-brand-secondary/20' 
-                                        : 'bg-amber-400/10 text-amber-400 border-amber-400/20'
-                                }`}>
-                                    {container.state}
-                                </span>
-                                <span className="text-[8px] text-slate-500 font-bold mt-1 uppercase">
-                                    {container.status}
-                                </span>
-                            </div>
+            <div className="glass-card rounded-4xl p-8 border-white/5">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-brand-primary/10 rounded-2xl flex items-center justify-center border border-brand-primary/20 shadow-inner">
+                            <Box size={24} className="text-brand-primary" />
                         </div>
+                        <div>
+                            <h3 className="text-lg font-black text-white tracking-tight">Docker Fleet</h3>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none mt-1">Container Management</p>
+                        </div>
+                    </div>
 
-                        <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div className="flex items-center gap-3 bg-white/3 p-2 rounded-xl border border-white/5">
-                                <Cpu size={12} className="text-brand-primary opacity-70" />
-                                <div className="flex flex-col">
-                                    <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">CPU Usage</span>
-                                    <span className="text-xs font-black text-white font-mono">{container.cpuPercentage.toFixed(1)}%</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 bg-white/3 p-2 rounded-xl border border-white/5">
-                                <Activity size={12} className="text-brand-secondary opacity-70" />
-                                <div className="flex flex-col">
-                                    <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Memory</span>
-                                    <span className="text-xs font-black text-white font-mono">
-                                        {(container.memoryUsageBytes / 1024 / 1024).toFixed(1)}MB
+                    <div className="flex flex-wrap gap-2">
+                        <Tab id="all" label="All" count={localStats.all} icon={Box} />
+                        <Tab id="running" label="Active" count={localStats.running} icon={CheckCircle2} />
+                        <Tab id="stopped" label="Stopped" count={localStats.stopped} icon={XCircle} />
+                        <Tab id="failed" label="Failed" count={localStats.failed} icon={AlertCircle} />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                    {filteredContainers.map((container) => (
+                        <div 
+                            key={container.containerId} 
+                            className="p-6 rounded-3xl bg-white/2 border border-white/5 hover:bg-white/4 transition-all group relative overflow-hidden flex flex-col justify-between h-full"
+                        >
+                            {/* Status Indicator Bar */}
+                            <div className={`absolute top-0 left-0 w-full h-1 ${
+                                container.state === 'running' ? 'bg-brand-secondary' : 
+                                container.status.toLowerCase().includes('exit') && !container.status.includes('exit (0)') ? 'bg-brand-accent' : 'bg-slate-700'
+                            }`}></div>
+
+                            <div className="flex justify-between items-start mb-6">
+                                <div className="flex flex-col min-w-0 pr-4">
+                                    <span className="text-sm font-black text-white truncate group-hover:text-brand-primary transition-colors">
+                                        {container.name}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-mono mt-1 truncate opacity-70">
+                                        {container.image}
                                     </span>
                                 </div>
+                                <div className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-tighter border ${
+                                    container.state === 'running' 
+                                        ? 'bg-brand-secondary/10 text-brand-secondary border-brand-secondary/20 shadow-[0_0_10px_rgba(34,211,238,0.1)]' 
+                                        : container.status.toLowerCase().includes('exit') && !container.status.includes('exit (0)')
+                                        ? 'bg-brand-accent/10 text-brand-accent border-brand-accent/20'
+                                        : 'bg-slate-800 text-slate-400 border-white/5'
+                                }`}>
+                                    {container.state}
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="flex flex-col gap-1.5">
+                                    <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                        <span>Resources</span>
+                                        <span className="text-white font-mono">{container.cpuPercentage.toFixed(1)}% / {(container.memoryUsageBytes / 1024 / 1024).toFixed(0)}MB</span>
+                                    </div>
+                                    <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                                        <div 
+                                            className={`h-full transition-all duration-1000 ${
+                                                container.cpuPercentage > 80 ? 'bg-brand-accent' : 'bg-brand-primary'
+                                            }`}
+                                            style={{ width: `${Math.min(container.cpuPercentage * 2, 100)}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 mt-4">
+                                    <div className="bg-white/3 p-2 rounded-xl border border-white/5 flex flex-col">
+                                        <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Net I/O</span>
+                                        <span className="text-[10px] font-black text-slate-300 font-mono truncate">{container.networkIO || '0B / 0B'}</span>
+                                    </div>
+                                    <div className="bg-white/3 p-2 rounded-xl border border-white/5 flex flex-col">
+                                        <span className="text-[8px] text-slate-500 font-black uppercase tracking-tighter">Disk I/O</span>
+                                        <span className="text-[10px] font-black text-slate-300 font-mono truncate">{container.blockIO || '0B / 0B'}</span>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between py-2 border-t border-white/5">
+                                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Status</span>
+                                    <span className="text-[10px] text-slate-300 font-bold font-mono truncate max-w-[120px]">
+                                        {container.status}
+                                    </span>
+                                </div>
+
+                                {/* Management Actions */}
+                                <div className="flex gap-2 pt-2 border-t border-white/5">
+                                    {container.state !== 'running' ? (
+                                        <button 
+                                            onClick={() => handleAction(container.containerId, 'start')}
+                                            disabled={loadingIds.has(container.containerId)}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-secondary/10 border border-brand-secondary/20 text-brand-secondary hover:bg-brand-secondary/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            <Play size={10} fill="currentColor" />
+                                            Start
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => handleAction(container.containerId, 'stop')}
+                                            disabled={loadingIds.has(container.containerId)}
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-accent/10 border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                                        >
+                                            <Square size={10} fill="currentColor" />
+                                            Stop
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={() => handleAction(container.containerId, 'restart')}
+                                        disabled={loadingIds.has(container.containerId)}
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                                    >
+                                        <RotateCcw size={10} />
+                                        Restart
+                                    </button>
+                                </div>
                             </div>
                         </div>
+                    ))}
 
-                        {/* Progress bar for CPU simplified */}
-                        <div className="w-full bg-white/5 h-1 rounded-full mt-4 overflow-hidden">
-                            <div 
-                                className="h-full bg-brand-primary transition-all duration-1000"
-                                style={{ width: `${Math.min(container.cpuPercentage, 100)}%` }}
-                            ></div>
+                    {filteredContainers.length === 0 && (
+                        <div className="col-span-full flex flex-col items-center justify-center py-20 bg-white/1 rounded-3xl border border-dashed border-white/10">
+                            <Box size={48} className="mb-4 text-slate-700 opacity-50" />
+                            <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-500">No {filter !== 'all' ? filter : ''} containers found</p>
                         </div>
-                    </div>
-                ))}
-
-                {(!containers || containers.length === 0) && (
-                    <div className="flex flex-col items-center justify-center py-16 opacity-30">
-                        <Box size={40} className="mb-4 text-slate-500" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">No Containers Detected</p>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         </div>
     );

@@ -45,4 +45,19 @@ export const authService = {
   }
 };
 
+export const dockerService = {
+  startContainer: async (id: string) => {
+    const response = await api.post(`/api/docker/container/${id}/start`);
+    return response.data;
+  },
+  stopContainer: async (id: string) => {
+    const response = await api.post(`/api/docker/container/${id}/stop`);
+    return response.data;
+  },
+  restartContainer: async (id: string) => {
+    const response = await api.post(`/api/docker/container/${id}/restart`);
+    return response.data;
+  }
+};
+
 export default api;

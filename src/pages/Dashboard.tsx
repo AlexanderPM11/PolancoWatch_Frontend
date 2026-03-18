@@ -228,7 +228,7 @@ export default function Dashboard() {
 
                 {/* Docker Containers Section */}
                 <div className="grid grid-cols-1 gap-8">
-                    <DockerPanel containers={metrics?.dockerContainers || []} />
+                    <DockerPanel containers={metrics?.dockerContainers || []} stats={metrics?.dockerStats} />
                 </div>
 
             </main>
