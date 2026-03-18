@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Trash2, Terminal, Search, ChevronDown, Download, Wifi, WifiOff } from 'lucide-react';
+import { Trash2, Terminal, Search, ChevronDown, Download, WifiOff } from 'lucide-react';
 import { logsService } from '../services/logsService';
 
 interface LogViewerProps {

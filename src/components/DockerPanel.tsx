@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Trash2, Terminal, Search, Filter } from 'lucide-react';
+import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Terminal, Search } from 'lucide-react';
 import Modal from './Modal';
 import { LogViewer } from './LogViewer';
 import type { DockerContainerMetrics, DockerStats } from '../hooks/useMetrics';

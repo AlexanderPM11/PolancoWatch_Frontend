@@ -6,7 +6,6 @@ import {
     History, 
     AlertTriangle, 
     CheckCircle2, 
-    Trash2,
     Activity,
     Cpu,
     MemoryStick,
@@ -14,7 +13,7 @@ import {
     Save,
     Clock
 } from 'lucide-react';
-import Modal from '../components/Modal';
+
 
 interface AlertRule {
     id: number;
@@ -222,7 +221,7 @@ export default function Alerts() {
                                             <AlertTriangle size={16} className="text-brand-accent" />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-[11px] font-black text-white uppercase tracking-tighter leading-relaxed mb-3 break-words">
+                                            <p className="text-[11px] font-black text-white uppercase tracking-tighter leading-relaxed mb-3 wrap-break-word">
                                                 {item.message}
                                             </p>
                                             <div className="flex items-center justify-between gap-4">
@@ -252,7 +251,7 @@ export default function Alerts() {
                 </div>
 
                 {errorMsg && (
-                    <div className="fixed bottom-10 right-10 z-[100] p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-[10px] font-black uppercase tracking-widest animate-slide-up flex items-center gap-3">
+                    <div className="fixed bottom-10 right-10 z-100 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-[10px] font-black uppercase tracking-widest animate-slide-up flex items-center gap-3">
                         <AlertTriangle size={16} />
                         {errorMsg}
                         <button onClick={() => setErrorMsg(null)} className="ml-4 hover:text-white">DISMISS</button>
