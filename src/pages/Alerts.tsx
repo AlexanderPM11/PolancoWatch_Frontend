@@ -45,6 +45,8 @@ interface NotificationSettings {
     smtpPass: string;
     fromEmail: string;
     toEmail: string;
+    telegramMessageTemplate: string;
+    emailMessageTemplate: string;
 }
 
 const MetricIcons = [
@@ -54,6 +56,60 @@ const MetricIcons = [
 ];
 
 const MetricNames = ["CPU_LOAD", "MEMORY_USAGE", "DISK_SPACE"];
+
+const PRESET_TEMPLATES = {
+    telegram: [
+        { 
+            name: "Industrial", 
+            text: "🚨 *PolancoWatch Alert*\n\n{Message}\n\n*Metric:* {Metric}\n*Value:* {Value}%\n*Threshold:* {Threshold}%\n*Date:* {Time} UTC" 
+        },
+        { 
+            name: "Compact", 
+            text: "⚠️ *{Metric}* Alert: *{Value}%* ({Threshold}% Limit)" 
+        },
+        { 
+            name: "Technical", 
+            text: "[SYSTEM_ALERT]\nstatus=critical\nmetric={Metric}\nvalue={Value}\nlimit={Threshold}\ntimestamp=\"{Time}\"" 
+        }
+    ],
+    email: [
+        {
+            name: "Industrial Red",
+            text: `<div style='font-family: sans-serif; padding: 20px; border: 1px solid #ff4444; border-radius: 8px;'>
+    <h2 style='color: #ff4444;'>🚨 PolancoWatch Alert</h2>
+    <p><strong>Message:</strong> {Message}</p>
+    <hr/>
+    <p><strong>Metric:</strong> {Metric}</p>
+    <p><strong>Current Value:</strong> {Value}%</p>
+    <p><strong>Threshold:</strong> {Threshold}%</p>
+    <p><strong>Time:</strong> {Time} UTC</p>
+</div>`
+        },
+        {
+            name: "Modern Blue",
+            text: `<div style='font-family: sans-serif; padding: 20px; border-top: 4px solid #3b82f6; background-color: #f8fafc; border-radius: 0 0 8px 8px;'>
+    <h2 style='color: #1e3a8a;'>System Notification</h2>
+    <p>{Message}</p>
+    <div style='background: white; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0;'>
+        <p><strong>Metric:</strong> {Metric}</p>
+        <p><strong>Value:</strong> <span style='color: #2563eb;'>{Value}%</span></p>
+    </div>
+    <p style='font-size: 11px; color: #94a3b8;'>{Time} UTC · PolancoWatch</p>
+</div>`
+        },
+        {
+            name: "Dark Premium",
+            text: `<div style='font-family: sans-serif; padding: 30px; background-color: #0f172a; color: #f1f5f9; border-radius: 12px;'>
+    <div style='border-left: 4px solid #f43f5e; padding-left: 20px;'>
+        <h2 style='color: #f43f5e; margin: 0; text-transform: uppercase;'>{Metric} EXCEEDED</h2>
+        <p style='color: #94a3b8;'>{Message}</p>
+    </div>
+    <p style='font-size: 24px; font-weight: bold; color: #fff;'>{Value}% detected</p>
+    <p style='font-size: 11px; color: #475569;'>UTC TIMESTAMP: {Time}</p>
+</div>`
+        }
+    ]
+};
 
 export default function Alerts() {
     const [rules, setRules] = useState<AlertRule[]>([]);
@@ -303,6 +359,29 @@ export default function Alerts() {
                                                     className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-sky-500/50"
                                                 />
                                             </div>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-end justify-between">
+                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Message Template (Markdown)</label>
+                                                    <div className="flex gap-2 mb-1">
+                                                        {PRESET_TEMPLATES.telegram.map(p => (
+                                                            <button 
+                                                                key={p.name}
+                                                                onClick={() => setSettings(s => s ? { ...s, telegramMessageTemplate: p.text } : null)}
+                                                                className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 hover:text-sky-400 hover:border-sky-500/30 transition-all uppercase tracking-tighter"
+                                                            >
+                                                                {p.name}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <textarea 
+                                                    rows={4}
+                                                    value={settings?.telegramMessageTemplate || ''}
+                                                    onChange={(e) => setSettings(s => s ? { ...s, telegramMessageTemplate: e.target.value } : null)}
+                                                    placeholder="🚨 *Alert* \n {Message}"
+                                                    className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-[11px] font-mono leading-relaxed text-sky-400 focus:outline-none focus:border-sky-500/50 resize-none"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
 
@@ -367,7 +446,52 @@ export default function Alerts() {
                                                     className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-rose-500/50"
                                                 />
                                             </div>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-end justify-between">
+                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">HTML Body Template</label>
+                                                    <div className="flex gap-2 mb-1">
+                                                        {PRESET_TEMPLATES.email.map(p => (
+                                                            <button 
+                                                                key={p.name}
+                                                                onClick={() => setSettings(s => s ? { ...s, emailMessageTemplate: p.text } : null)}
+                                                                className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 hover:text-rose-400 hover:border-rose-500/30 transition-all uppercase tracking-tighter"
+                                                            >
+                                                                {p.name}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <textarea 
+                                                    rows={4}
+                                                    value={settings?.emailMessageTemplate || ''}
+                                                    onChange={(e) => setSettings(s => s ? { ...s, emailMessageTemplate: e.target.value } : null)}
+                                                    placeholder="<h2 style='color: #ff4444;'>🚨 Alert: {Metric}</h2>"
+                                                    className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-[11px] font-mono leading-relaxed text-rose-400 focus:outline-none focus:border-rose-500/50 resize-none"
+                                                />
+                                            </div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                {/* Placeholder Guide */}
+                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <Clock size={16} className="text-slate-500" />
+                                        <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Protocol Variable Glossary</h4>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                        {[
+                                            { key: '{Metric}', desc: 'CPU, MEM, etc.' },
+                                            { key: '{Value}', desc: 'Current usage' },
+                                            { key: '{Threshold}', desc: 'Rule limit' },
+                                            { key: '{Time}', desc: 'UTC Timestamp' },
+                                            { key: '{Message}', desc: 'Default text' }
+                                        ].map(v => (
+                                            <div key={v.key} className="flex flex-col gap-1">
+                                                <code className="text-brand-accent text-[10px] font-black">{v.key}</code>
+                                                <span className="text-[9px] text-slate-500 uppercase font-bold">{v.desc}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
 
