@@ -138,11 +138,22 @@ export default function Sidebar() {
                 </button>
             </div>
 
-            {/* Security Indicator */}
+            {/* Security Indicator & Branding */}
             {!collapsed && (
-                <div className="px-8 py-6 flex items-center gap-3 opacity-40">
-                    <ShieldCheck size={14} className="text-brand-secondary" />
-                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.4em]">Auth Level 4: Admin</span>
+                <div className="px-8 py-6 space-y-4">
+                    <div className="flex items-center gap-3 opacity-40">
+                        <ShieldCheck size={14} className="text-brand-secondary" />
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.4em]">Auth Level 4: Admin</span>
+                    </div>
+                    
+                    <a 
+                        href="https://apolanco.com" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block text-[9px] font-bold text-slate-500 hover:text-brand-primary transition-colors duration-300 uppercase tracking-[0.2em] opacity-60 hover:opacity-100"
+                    >
+                        Developed by <span className="text-brand-secondary">apolanco.com</span>
+                    </a>
                 </div>
             )}
         </aside>
