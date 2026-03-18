@@ -17,6 +17,7 @@
   --animate-float: float 6s ease-in-out infinite;
   --animate-fade-in: fadeIn 0.5s ease-out forwards;
   --animate-float-up: floatUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-shimmer: shimmer 2s linear infinite;
 }
 
 @keyframes fadeIn {
@@ -32,6 +33,11 @@
 @keyframes floatUp {
   from { opacity: 0; transform: translateY(20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @layer base {
@@ -81,5 +87,9 @@
 
   .animate-fade-in {
     animation: fadeIn 0.5s ease-out forwards;
+  }
+
+  .skeleton {
+    @apply bg-linear-to-r from-white/5 via-white/10 to-white/5 bg-[length:200%_100%] animate-shimmer;
   }
 }
