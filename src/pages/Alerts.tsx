@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
-import { alertsService } from '../services/api';
-import { 
-    Bell, 
-    Settings, 
-    History, 
-    AlertTriangle, 
-    CheckCircle2, 
+import { alertsService, settingsService } from '../services/api';
+import {
+    Bell,
+    Settings,
+    History,
+    AlertTriangle,
+    CheckCircle2,
     Activity,
     Cpu,
     MemoryStick,
     HardDrive,
     Save,
-    Clock
+    Clock,
+    Send,
+    Mail
 } from 'lucide-react';
-
 
 interface AlertRule {
     id: number;
@@ -31,6 +32,21 @@ interface AlertHistory {
     triggeredAt: string;
 }
 
+interface NotificationSettings {
+    id: number;
+    telegramEnabled: boolean;
+    telegramBotToken: string;
+    telegramChatId: string;
+    emailEnabled: boolean;
+    smtpHost: string;
+    smtpPort: number;
+    smtpEnableSsl: boolean;
+    smtpUser: string;
+    smtpPass: string;
+    fromEmail: string;
+    toEmail: string;
+}
+
 const MetricIcons = [
     <Cpu size={16} className="text-brand-primary" />,
     <MemoryStick size={16} className="text-brand-secondary" />,
@@ -42,9 +58,12 @@ const MetricNames = ["CPU_LOAD", "MEMORY_USAGE", "DISK_SPACE"];
 export default function Alerts() {
     const [rules, setRules] = useState<AlertRule[]>([]);
     const [history, setHistory] = useState<AlertHistory[]>([]);
+    const [settings, setSettings] = useState<NotificationSettings | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState<number | null>(null);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState<'rules' | 'notifications'>('rules');
 
     useEffect(() => {
         fetchData();
@@ -53,17 +72,32 @@ export default function Alerts() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            const [rulesData, historyData] = await Promise.all([
+            const [rulesData, historyData, settingsData] = await Promise.all([
                 alertsService.getRules(),
-                alertsService.getHistory()
+                alertsService.getHistory(),
+                settingsService.getNotificationSettings()
             ]);
             setRules(rulesData);
             setHistory(historyData);
+            setSettings(settingsData);
         } catch (err) {
             console.error("Failed to fetch alerts data:", err);
             setErrorMsg("Failed to synchronize with Alert Engine.");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleUpdateSettings = async () => {
+        if (!settings) return;
+        setIsSavingSettings(true);
+        try {
+            await settingsService.updateNotificationSettings(settings);
+            setErrorMsg(null);
+        } catch (err) {
+            setErrorMsg("Failed to update notification protocols.");
+        } finally {
+            setIsSavingSettings(false);
         }
     };
 
@@ -97,7 +131,6 @@ export default function Alerts() {
         }
     };
 
-
     return (
         <div className="min-h-screen bg-obsidian-950 text-slate-300 font-sans selection:bg-brand-primary/30 flex-1 pl-0 lg:pl-20 xl:pl-72 transition-all duration-500">
             {/* Background Texture Overlay */}
@@ -126,84 +159,230 @@ export default function Alerts() {
                     </button>
                 </header>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                    {/* Rules Configuration */}
-                    <div className="lg:col-span-2 space-y-8">
-                        <div className="flex items-center gap-3 mb-2">
-                            <Settings size={18} className="text-brand-primary" />
-                            <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Threshold Protocols</h3>
-                        </div>
+                {/* Navigation Tabs */}
+                <div className="flex items-center gap-2 mb-10 p-1 bg-white/5 rounded-2xl w-fit border border-white/5">
+                    <button 
+                        onClick={() => setActiveTab('rules')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'rules' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        Sentinel Rules
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('notifications')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notifications' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        Notifications
+                    </button>
+                </div>
 
-                        <div className="grid grid-cols-1 gap-6">
-                            {rules.map((rule) => (
-                                <div key={rule.id} className="glass-panel rounded-3xl p-6 border-white/5 hover:border-brand-primary/20 transition-all group">
-                                    <div className="flex flex-col md:flex-row items-center justify-between gap-8">
-                                        <div className="flex items-center gap-5 w-full md:w-auto">
-                                            <div className="w-12 h-12 rounded-2xl bg-obsidian-900 border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                {MetricIcons[rule.metricType]}
-                                            </div>
-                                            <div>
-                                                <div className="text-white font-black text-sm uppercase tracking-tight">{MetricNames[rule.metricType]}</div>
-                                                <div className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Status: {rule.isActive ? 'OPERATIONAL' : 'DORMANT'}</div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    <div className="lg:col-span-2 space-y-8">
+                        {activeTab === 'rules' ? (
+                            <>
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Settings size={18} className="text-brand-primary" />
+                                    <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Threshold Protocols</h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-6">
+                                    {rules.map((rule) => (
+                                        <div key={rule.id} className="glass-panel rounded-3xl p-6 border-white/5 hover:border-brand-primary/20 transition-all group">
+                                            <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+                                                <div className="flex items-center gap-5 w-full md:w-auto">
+                                                    <div className="w-12 h-12 rounded-2xl bg-obsidian-900 border border-white/5 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                                        {MetricIcons[rule.metricType]}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-white font-black text-sm uppercase tracking-tight">{MetricNames[rule.metricType]}</div>
+                                                        <div className="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-1">Status: {rule.isActive ? 'OPERATIONAL' : 'DORMANT'}</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Threshold</label>
+                                                        <div className="flex items-center gap-2">
+                                                            <input 
+                                                                type="number" 
+                                                                value={rule.threshold}
+                                                                onChange={(e) => updateThreshold(rule, e.target.value)}
+                                                                className="w-16 bg-obsidian-950 border border-white/5 rounded-xl px-2 py-2 text-xs font-mono font-black text-brand-primary focus:outline-none focus:border-brand-primary/50"
+                                                            />
+                                                            <span className="text-[10px] font-black text-slate-500">%</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-col gap-1">
+                                                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Cooldown</label>
+                                                        <div className="flex items-center gap-2">
+                                                            <input 
+                                                                type="number" 
+                                                                value={rule.cooldownSeconds}
+                                                                onChange={(e) => updateCooldown(rule, e.target.value)}
+                                                                className="w-16 bg-obsidian-950 border border-white/5 rounded-xl px-2 py-2 text-xs font-mono font-black text-brand-secondary focus:outline-none focus:border-brand-secondary/50"
+                                                            />
+                                                            <span className="text-[10px] font-black text-slate-500">s</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3">
+                                                        <button 
+                                                            onClick={() => toggleRuleActive(rule)}
+                                                            className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${rule.isActive ? 'bg-brand-primary shadow-[0_0_12px_rgba(167,139,250,0.4)]' : 'bg-slate-800'}`}
+                                                        >
+                                                            <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${rule.isActive ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                                        </button>
+
+                                                        <button 
+                                                            onClick={() => handleUpdateRule(rule)}
+                                                            disabled={isSaving === rule.id}
+                                                            className="p-3 bg-white/5 hover:bg-brand-primary hover:text-white rounded-xl text-slate-400 transition-all group/btn"
+                                                        >
+                                                            <Save size={16} className={isSaving === rule.id ? 'animate-pulse' : ''} />
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
+                                    ))}
 
-                                        <div className="flex flex-wrap items-center gap-6 w-full md:w-auto justify-between md:justify-end">
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Threshold</label>
-                                                <div className="flex items-center gap-2">
-                                                    <input 
-                                                        type="number" 
-                                                        value={rule.threshold}
-                                                        onChange={(e) => updateThreshold(rule, e.target.value)}
-                                                        className="w-16 bg-obsidian-950 border border-white/5 rounded-xl px-2 py-2 text-xs font-mono font-black text-brand-primary focus:outline-none focus:border-brand-primary/50"
-                                                    />
-                                                    <span className="text-[10px] font-black text-slate-500">%</span>
+                                    {!rules.length && !isLoading && (
+                                        <div className="py-20 glass-panel rounded-3xl border-dashed border-white/5 flex flex-col items-center justify-center opacity-40">
+                                            <Settings size={40} className="mb-4 text-slate-500" />
+                                            <p className="text-[10px] font-black uppercase tracking-[0.2em]">No protocols initialized</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="space-y-10 animate-fade-in">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Send size={18} className="text-brand-secondary" />
+                                    <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Transmission Protocols</h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {/* Telegram Settings */}
+                                    <div className="glass-panel rounded-3xl p-8 border-white/5 hover:border-brand-secondary/20 transition-all flex flex-col gap-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+                                                    <Send size={18} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-white font-black text-sm uppercase tracking-tight">Telegram Bot</h4>
+                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Instant Messaging Hub</p>
                                                 </div>
                                             </div>
+                                            <button 
+                                                onClick={() => setSettings(s => s ? { ...s, telegramEnabled: !s.telegramEnabled } : null)}
+                                                className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${settings?.telegramEnabled ? 'bg-sky-500 shadow-[0_0_12px_rgba(14,165,233,0.4)]' : 'bg-slate-800'}`}
+                                            >
+                                                <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${settings?.telegramEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                            </button>
+                                        </div>
 
-                                            <div className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Cooldown</label>
-                                                <div className="flex items-center gap-2">
-                                                    <input 
-                                                        type="number" 
-                                                        value={rule.cooldownSeconds}
-                                                        onChange={(e) => updateCooldown(rule, e.target.value)}
-                                                        className="w-16 bg-obsidian-950 border border-white/5 rounded-xl px-2 py-2 text-xs font-mono font-black text-brand-secondary focus:outline-none focus:border-brand-secondary/50"
-                                                    />
-                                                    <span className="text-[10px] font-black text-slate-500">s</span>
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Bot Token</label>
+                                                <input 
+                                                    type="password"
+                                                    value={settings?.telegramBotToken || ''}
+                                                    onChange={(e) => setSettings(s => s ? { ...s, telegramBotToken: e.target.value } : null)}
+                                                    placeholder="0000000000:AA..."
+                                                    className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-sky-500/50"
+                                                />
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Chat ID</label>
+                                                <input 
+                                                    type="text"
+                                                    value={settings?.telegramChatId || ''}
+                                                    onChange={(e) => setSettings(s => s ? { ...s, telegramChatId: e.target.value } : null)}
+                                                    placeholder="eg. -100123456789"
+                                                    className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-sky-500/50"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Email Settings */}
+                                    <div className="glass-panel rounded-3xl p-8 border-white/5 hover:border-brand-secondary/20 transition-all flex flex-col gap-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                                                    <Mail size={18} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-white font-black text-sm uppercase tracking-tight">SMTP Email</h4>
+                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">Reliable Reporting</p>
                                                 </div>
                                             </div>
+                                            <button 
+                                                onClick={() => setSettings(s => s ? { ...s, emailEnabled: !s.emailEnabled } : null)}
+                                                className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${settings?.emailEnabled ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.4)]' : 'bg-slate-800'}`}
+                                            >
+                                                <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${settings?.emailEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                            </button>
+                                        </div>
 
-                                            <div className="flex items-center gap-3">
-
-                                                <button 
-                                                    onClick={() => toggleRuleActive(rule)}
-                                                    className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${rule.isActive ? 'bg-brand-primary shadow-[0_0_12px_rgba(167,139,250,0.4)]' : 'bg-slate-800'}`}
-                                                >
-                                                    <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${rule.isActive ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                                                </button>
-
-                                                <button 
-                                                    onClick={() => handleUpdateRule(rule)}
-                                                    disabled={isSaving === rule.id}
-                                                    className="p-3 bg-white/5 hover:bg-brand-primary hover:text-white rounded-xl text-slate-400 transition-all group/btn"
-                                                >
-                                                    <Save size={16} className={isSaving === rule.id ? 'animate-pulse' : ''} />
-                                                </button>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-3 gap-4">
+                                                <div className="col-span-2 flex flex-col gap-2">
+                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">SMTP Host</label>
+                                                    <input 
+                                                        type="text"
+                                                        value={settings?.smtpHost || ''}
+                                                        onChange={(e) => setSettings(s => s ? { ...s, smtpHost: e.target.value } : null)}
+                                                        className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-rose-500/50"
+                                                    />
+                                                </div>
+                                                <div className="flex flex-col gap-2">
+                                                    <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Port</label>
+                                                    <input 
+                                                        type="number"
+                                                        value={settings?.smtpPort || 587}
+                                                        onChange={(e) => setSettings(s => s ? { ...s, smtpPort: parseInt(e.target.value) } : null)}
+                                                        className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-rose-500/50"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                                    <input 
+                                                        type="checkbox"
+                                                        checked={settings?.smtpEnableSsl || false}
+                                                        onChange={(e) => setSettings(s => s ? { ...s, smtpEnableSsl: e.target.checked } : null)}
+                                                        className="accent-rose-500"
+                                                    />
+                                                    Enable SSL/TLS
+                                                </label>
+                                            </div>
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Recipient (To Email)</label>
+                                                <input 
+                                                    type="email"
+                                                    value={settings?.toEmail || ''}
+                                                    onChange={(e) => setSettings(s => s ? { ...s, toEmail: e.target.value } : null)}
+                                                    className="w-full bg-obsidian-950 border border-white/5 rounded-2xl px-4 py-3 text-xs font-mono font-black text-white focus:outline-none focus:border-rose-500/50"
+                                                />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
 
-                            {!rules.length && !isLoading && (
-                                <div className="py-20 glass-panel rounded-3xl border-dashed border-white/5 flex flex-col items-center justify-center opacity-40">
-                                    <Settings size={40} className="mb-4 text-slate-500" />
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em]">No protocols initialized</p>
+                                <div className="flex justify-end">
+                                    <button 
+                                        onClick={handleUpdateSettings}
+                                        disabled={isSavingSettings}
+                                        className="px-10 py-5 bg-brand-secondary hover:bg-white hover:text-brand-secondary rounded-3xl text-[12px] font-black uppercase tracking-widest transition-all flex items-center gap-4 shadow-[0_15px_35px_rgba(20,184,166,0.3)] hover:shadow-white/20 active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isSavingSettings ? <Activity size={18} className="animate-spin" /> : <Save size={18} />}
+                                        Commit Protocol Updates
+                                    </button>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Alert History */}
@@ -251,13 +430,12 @@ export default function Alerts() {
                 </div>
 
                 {errorMsg && (
-                    <div className="fixed bottom-10 right-10 z-100 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-[10px] font-black uppercase tracking-widest animate-slide-up flex items-center gap-3">
+                    <div className="fixed bottom-10 right-10 z-50 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl text-rose-400 text-[10px] font-black uppercase tracking-widest animate-slide-up flex items-center gap-3">
                         <AlertTriangle size={16} />
                         {errorMsg}
                         <button onClick={() => setErrorMsg(null)} className="ml-4 hover:text-white">DISMISS</button>
                     </div>
-                )
-}
+                )}
             </main>
         </div>
     );

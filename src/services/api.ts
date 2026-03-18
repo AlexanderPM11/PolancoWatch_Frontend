@@ -75,4 +75,15 @@ export const alertsService = {
   }
 };
 
+export const settingsService = {
+  getNotificationSettings: async () => {
+    const response = await api.get('/api/settings/notifications');
+    return response.data;
+  },
+  updateNotificationSettings: async (settings: any) => {
+    const response = await api.put('/api/settings/notifications', settings);
+    return response.data;
+  }
+};
+
 export default api;
