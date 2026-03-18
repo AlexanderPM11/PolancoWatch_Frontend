@@ -4,6 +4,7 @@ import { useMetrics } from '../hooks/useMetrics';
 import { authService } from '../services/api';
 import { Activity, Cpu, HardDrive, Network, Server, MemoryStick } from 'lucide-react';
 import { MetricChart } from '../components/MetricChart';
+import { DockerPanel } from '../components/DockerPanel';
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -223,6 +224,11 @@ export default function Dashboard() {
                             )}
                         </div>
                     </div>
+                </div>
+
+                {/* Docker Containers Section */}
+                <div className="grid grid-cols-1 gap-8">
+                    <DockerPanel containers={metrics?.dockerContainers || []} />
                 </div>
 
             </main>

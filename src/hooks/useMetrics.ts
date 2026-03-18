@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { signalRService } from '../services/signalr';
 
+export interface DockerContainerMetrics {
+    containerId: string;
+    name: string;
+    image: string;
+    status: string;
+    state: string;
+    cpuPercentage: number;
+    memoryUsageBytes: number;
+}
+
 export interface ServerMetricsSnapshot {
     cpu: any;
     memory: any;
@@ -8,6 +18,7 @@ export interface ServerMetricsSnapshot {
     networks: any[];
     systemInfo: any;
     topProcesses: any[];
+    dockerContainers: DockerContainerMetrics[];
     timestampUtc: string;
 }
 

@@ -23,97 +23,133 @@ export default function Documentation() {
                         </button>
                         <div className="flex items-center gap-3 opacity-50">
                             <Terminal size={14} className="text-brand-primary" />
-                            <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">REF_DOCS_v1</span>
+                            <span className="text-[10px] font-black text-white uppercase tracking-[0.3em]">REF_DOCS_v1.5</span>
                         </div>
                     </div>
 
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-widest mb-6">
-                        <Info size={12} /> System Internals
+                        <Info size={12} /> System Internals & Security
                     </div>
-                    <h1 className="text-5xl font-black text-white tracking-tighter mb-4">Metric Calculation <br/><span className="text-brand-secondary">Methodology</span></h1>
-                    <p className="text-lg text-slate-400 max-w-2xl leading-relaxed">
-                        PolancoWatch utilizes low-level OS interfaces to extract high-precision telemetry with minimal overhead. This page details the mathematical models and system calls used for each metric.
+                    <h1 className="text-5xl font-black text-white tracking-tighter mb-4">Platform Architecture <br/><span className="text-brand-secondary">& Security Models</span></h1>
+                    <p className="text-lg text-slate-400 max-w-3xl leading-relaxed">
+                        PolancoWatch is a high-performance monitoring stack designed for real-time visibility. This documentation covers the underlying architecture, security protocols, and metric collection methodology.
                     </p>
                 </header>
 
 
                 <div className="space-y-12">
-                    {/* CPU Section */}
-                    <section className="glass-panel rounded-4xl p-10 border-white/5">
+                    {/* Architecture Overview */}
+                    <section className="glass-panel rounded-4xl p-10 border-white/5 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-10">
+                            <Settings size={120} className="animate-spin-slow" />
+                        </div>
                         <div className="flex items-start gap-6 mb-8">
                             <div className="w-14 h-14 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary">
-                                <Cpu size={28} />
+                                <Activity size={28} />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black text-white tracking-tight uppercase">Central Processing Unit</h2>
-                                <p className="text-slate-400 text-sm mt-1">Processor Load & Utilization Analysis</p>
+                                <h2 className="text-2xl font-black text-white tracking-tight uppercase">System Architecture</h2>
+                                <p className="text-slate-400 text-sm mt-1">Real-time Data Pipeline & Orchestration</p>
                             </div>
                         </div>
                         
                         <div className="grid md:grid-cols-2 gap-12">
                             <div>
-                                <h3 className="text-xs font-black text-brand-secondary uppercase tracking-widest mb-4">Linux Implementation</h3>
-                                <p className="text-sm leading-relaxed mb-4">
-                                    Metrics are derived from <code className="text-brand-primary font-mono bg-white/5 px-1.5 py-0.5 rounded">/proc/stat</code>. The system calculates the aggregate time spent in various states (user, nice, system, idle, etc.).
+                                <h3 className="text-xs font-black text-brand-secondary uppercase tracking-widest mb-4">Backend Core</h3>
+                                <p className="text-sm leading-relaxed mb-4 text-slate-300">
+                                    Built on <span className="text-white font-bold">ASP.NET Core 8</span>, the backend operates as a distributed-ready API. It features a <span className="text-brand-primary">SystemMetricsHostedService</span> that heartbeats every 2 seconds, scraping OS-level telemetry.
                                 </p>
-                                <div className="bg-obsidian-950 rounded-xl p-4 border border-white/5 font-mono text-[11px] space-y-2">
-                                    <div className="text-slate-500">// Calculation Logic</div>
-                                    <div className="text-white">deltaTotal = currentTotal - previousTotal</div>
-                                    <div className="text-white">deltaIdle = currentIdle - previousIdle</div>
-                                    <div className="text-brand-secondary">Usage% = (1.0 - (deltaIdle / deltaTotal)) * 100</div>
-                                </div>
+                                <ul className="space-y-3">
+                                    <li className="flex gap-3 text-sm">
+                                        <div className="w-1 h-1 rounded-full bg-brand-primary mt-2"></div>
+                                        <span><strong className="text-white">SignalR Hub:</strong> Direct WebSocket streaming for sub-second UI latency.</span>
+                                    </li>
+                                    <li className="flex gap-3 text-sm">
+                                        <div className="w-1 h-1 rounded-full bg-brand-primary mt-2"></div>
+                                        <span><strong className="text-white">Background Workers:</strong> Decoupled threshold evaluation for instant alerting.</span>
+                                    </li>
+                                </ul>
                             </div>
                             <div>
-                                <h3 className="text-xs font-black text-brand-secondary uppercase tracking-widest mb-4">Windows Implementation</h3>
-                                <p className="text-sm leading-relaxed mb-4">
-                                    Utilizes the <code className="text-brand-primary font-mono bg-white/5 px-1.5 py-0.5 rounded">PerformanceCounter</code> API specifically targeting the <code className="text-slate-300">Processor / % Processor Time / _Total</code> instance.
+                                <h3 className="text-xs font-black text-brand-secondary uppercase tracking-widest mb-4">Data Persistence</h3>
+                                <p className="text-sm leading-relaxed mb-4 text-slate-300">
+                                    Utilizes a lightweight <span className="text-brand-primary">SQLite</span> instance for configuration and event logging, ensuring zero-configuration deployment while maintaining ACID compliance.
                                 </p>
                                 <div className="bg-obsidian-950 rounded-xl p-4 border border-white/5 font-mono text-[11px]">
-                                    <div className="text-slate-500">// Native Windows API</div>
-                                    <div className="text-white">NextValue() query against Registry/PerfData</div>
+                                    <div className="text-slate-500">// Infrastructure Layer</div>
+                                    <div className="text-white">Entity Framework Core + SQLite</div>
+                                    <div className="text-brand-secondary">Automated Database Evolution</div>
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    {/* Memory Section */}
-                    <section className="glass-panel rounded-4xl p-10 border-white/5">
+                    {/* Security Section */}
+                    <section className="glass-panel rounded-4xl p-10 border-white/5 bg-gradient-to-br from-brand-primary/5 to-transparent">
                         <div className="flex items-start gap-6 mb-8">
-                            <div className="w-14 h-14 rounded-2xl bg-brand-secondary/10 border border-brand-secondary/20 flex items-center justify-center text-brand-secondary">
-                                <Activity size={28} />
+                            <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500">
+                                <Settings size={28} />
                             </div>
                             <div>
-                                <h2 className="text-2xl font-black text-white tracking-tight uppercase">Random Access Memory</h2>
-                                <p className="text-slate-400 text-sm mt-1">Volatile Storage & Page Cache Tracking</p>
+                                <h2 className="text-2xl font-black text-white tracking-tight uppercase">Security & Privacy</h2>
+                                <p className="text-slate-400 text-sm mt-1">Credential Safety & Session Integrity</p>
                             </div>
                         </div>
                         
                         <div className="grid md:grid-cols-2 gap-12">
                             <div>
-                                <h3 className="text-xs font-black text-brand-primary uppercase tracking-widest mb-4">Linux Implementation</h3>
-                                <p className="text-sm leading-relaxed mb-4">
-                                    Interprets <code className="text-brand-secondary font-mono bg-white/5 px-1.5 py-0.5 rounded">/proc/meminfo</code>. "Used" memory is defined as Total minus Available (which includes reclaimable buffers/cache).
+                                <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-4">Credential Protection</h3>
+                                <p className="text-sm leading-relaxed mb-4 text-slate-300">
+                                    Passwords are never stored in plain text. We utilize the <span className="text-white font-bold">BCrypt.Net</span> adaptive hashing algorithm, which incorporates a per-user salt and computational cost factor to nullify brute-force and rainbow table attacks.
                                 </p>
                                 <div className="bg-obsidian-950 rounded-xl p-4 border border-white/5 font-mono text-[11px]">
-                                    <div className="text-slate-500">// Strategy</div>
-                                    <div className="text-white">Total = MemTotal</div>
-                                    <div className="text-white">Free = MemAvailable</div>
-                                    <div className="text-brand-primary">Used = Total - Free</div>
+                                    <div className="text-slate-500">// One-Way Cryptographic Hash</div>
+                                    <div className="text-emerald-500">BCrypt.HashPassword(raw_password)</div>
                                 </div>
                             </div>
                             <div>
-                                <h3 className="text-xs font-black text-brand-primary uppercase tracking-widest mb-4">Windows Implementation</h3>
-                                <p className="text-sm leading-relaxed mb-4">
-                                    Queries <code className="text-brand-secondary font-mono bg-white/5 px-1.5 py-0.5 rounded">WMI (Win32_ComputerSystem)</code> for physical hardware limits and uses Performance Counters for real-time availability.
+                                <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-4">Session Authorization</h3>
+                                <p className="text-sm leading-relaxed mb-4 text-slate-300">
+                                    Stateless authentication is handled via <span className="text-white font-bold">JSON Web Tokens (JWT)</span>. Each request to sensitive endpoints must include a signed token, ensuring that your monitoring data remains inaccessible to unauthorized actors.
                                 </p>
                                 <div className="bg-obsidian-950 rounded-xl p-4 border border-white/5 font-mono text-[11px]">
-                                    <div className="text-slate-500">// Strategy</div>
-                                    <div className="text-white">Query TotalPhysicalMemory</div>
-                                    <div className="text-brand-primary">Used = Total - AvailableBytes</div>
+                                    <div className="text-slate-500">// Algorithm: HMAC-SHA256</div>
+                                    <div className="text-white">Authorization: Bearer [JWT_TOKEN]</div>
                                 </div>
                             </div>
                         </div>
                     </section>
+
+                    {/* Metric Methodology Split */}
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* CPU */}
+                        <section className="glass-panel rounded-4xl p-10 border-white/5">
+                            <div className="flex items-center gap-4 mb-6">
+                                <Cpu className="text-brand-primary" size={24} />
+                                <h2 className="text-xl font-black text-white tracking-tight uppercase">CPU Tracking</h2>
+                            </div>
+                            <p className="text-sm text-slate-400 leading-relaxed mb-6">
+                                Derived from <code className="text-brand-primary font-mono text-[10px] bg-white/5 px-1 rounded">/proc/stat</code> (Linux) and <code className="text-brand-primary font-mono text-[10px] bg-white/5 px-1 rounded">PercCounter</code> (Win).
+                            </p>
+                            <div className="bg-obsidian-950 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-brand-secondary">
+                                Usage% = (1.0 - (deltaIdle / deltaTotal)) * 100
+                            </div>
+                        </section>
+
+                        {/* Memory */}
+                        <section className="glass-panel rounded-4xl p-10 border-white/5">
+                            <div className="flex items-center gap-4 mb-6">
+                                <Activity className="text-brand-secondary" size={24} />
+                                <h2 className="text-xl font-black text-white tracking-tight uppercase">RAM Analysis</h2>
+                            </div>
+                            <p className="text-sm text-slate-400 leading-relaxed mb-6">
+                                Total memory minus available pages (including reclaimable cache).
+                            </p>
+                            <div className="bg-obsidian-950 rounded-xl p-4 border border-white/5 font-mono text-[10px] text-brand-primary">
+                                Used = MemTotal - MemAvailable
+                            </div>
+                        </section>
+                    </div>
 
                     {/* Networking & Disk Section */}
                     <div className="grid md:grid-cols-2 gap-8">
@@ -122,20 +158,17 @@ export default function Documentation() {
                                 <Network className="text-brand-secondary" size={24} />
                                 <h2 className="text-xl font-black text-white tracking-tight uppercase">Networking</h2>
                             </div>
-                            <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                                Calculated by polling interface byte counters.
-                            </p>
                             <ul className="space-y-4">
                                 <li className="flex gap-3">
                                     <div className="w-1.5 h-1.5 rounded-full bg-brand-secondary mt-1.5"></div>
                                     <div className="text-sm">
-                                        <span className="text-white font-bold">Linux:</span> Delta analysis of <code className="text-brand-secondary font-mono text-[10px] bg-white/5 px-1 rounded">/proc/net/dev</code> byte columns.
+                                        <span className="text-white font-bold">Linux:</span> Byte-level delta of <code className="text-brand-secondary font-mono text-[10px]">/proc/net/dev</code>.
                                     </div>
                                 </li>
                                 <li className="flex gap-3">
                                     <div className="w-1.5 h-1.5 rounded-full bg-brand-secondary mt-1.5"></div>
                                     <div className="text-sm">
-                                        <span className="text-white font-bold">Windows:</span> <code className="text-brand-secondary font-mono text-[10px] bg-white/5 px-1 rounded"> ni.GetIPStatistics()</code> native interface polling.
+                                        <span className="text-white font-bold">Windows:</span> Native <code className="text-brand-secondary font-mono text-[10px]">GetIPStatistics</code> polling.
                                     </div>
                                 </li>
                             </ul>
@@ -146,20 +179,17 @@ export default function Documentation() {
                                 <HardDrive className="text-brand-primary" size={24} />
                                 <h2 className="text-xl font-black text-white tracking-tight uppercase">Storage</h2>
                             </div>
-                            <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                                Cross-platform implementation using high-level drive enumerations.
-                            </p>
                             <ul className="space-y-4">
                                 <li className="flex gap-3">
                                     <div className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-1.5"></div>
                                     <div className="text-sm">
-                                        <span className="text-white font-bold">Driver:</span> <code className="text-brand-primary font-mono text-[10px] bg-white/5 px-1 rounded">DriveInfo.GetDrives()</code>
+                                        <span className="text-white font-bold">Driver:</span> Cross-platform <code className="text-brand-primary font-mono text-[10px]">DriveInfo</code> API.
                                     </div>
                                 </li>
                                 <li className="flex gap-3">
                                     <div className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-1.5"></div>
                                     <div className="text-sm">
-                                        <span className="text-white font-bold">Filter:</span> Excludes loopbacks, snapping, and system-level virtual mounts.
+                                        <span className="text-white font-bold">Filter:</span> Intelligent exclusion of system virtual mounts.
                                     </div>
                                 </li>
                             </ul>
