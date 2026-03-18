@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 import { alertsService, settingsService } from '../services/api';
-import {
-    Bell,
-    Settings,
-    History,
-    AlertTriangle,
-    CheckCircle2,
-    Activity,
+import Modal from '../components/Modal';
+import { 
+    Activity, 
+    Bell, 
+    Save, 
+    Trash2,
+    Clock, 
+    Send, 
+    Settings, 
+    History, 
+    AlertTriangle, 
+    Mail,
     Cpu,
     MemoryStick,
     HardDrive,
-    Save,
-    Clock,
-    Send,
-    Mail
+    CheckCircle2
 } from 'lucide-react';
 
 interface AlertRule {
@@ -111,6 +113,8 @@ const PRESET_TEMPLATES = {
     ]
 };
 
+const normalizeTemplate = (str: string) => str?.replace(/\r\n/g, '\n').trim() || '';
+
 export default function Alerts() {
     const [rules, setRules] = useState<AlertRule[]>([]);
     const [history, setHistory] = useState<AlertHistory[]>([]);
@@ -118,6 +122,7 @@ export default function Alerts() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState<number | null>(null);
     const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isClearModalOpen, setIsClearModalOpen] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'rules' | 'notifications'>('rules');
 
@@ -141,6 +146,29 @@ export default function Alerts() {
             setErrorMsg("Failed to synchronize with Alert Engine.");
         } finally {
             setIsLoading(false);
+        }
+    };
+
+    const handleClearHistory = async () => {
+        setIsClearModalOpen(false);
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/alerts/history`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                setHistory([]);
+                setErrorMsg(null);
+            } else {
+                const errorData = await response.json();
+                setErrorMsg(errorData.message || "Failed to clear incident log.");
+            }
+        } catch (error) {
+            console.error('Failed to clear history:', error);
+            setErrorMsg("Failed to connect to the server to clear incident log.");
         }
     };
 
@@ -190,7 +218,7 @@ export default function Alerts() {
     return (
         <div className="min-h-screen bg-obsidian-950 text-slate-300 font-sans selection:bg-brand-primary/30 flex-1 pl-0 lg:pl-20 xl:pl-72 transition-all duration-500">
             {/* Background Texture Overlay */}
-            <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0" 
+            <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0"
                  style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
             </div>
 
@@ -206,7 +234,7 @@ export default function Alerts() {
                         </p>
                     </div>
 
-                    <button 
+                    <button
                         onClick={fetchData}
                         className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all flex items-center gap-3"
                     >
@@ -217,13 +245,13 @@ export default function Alerts() {
 
                 {/* Navigation Tabs */}
                 <div className="flex items-center gap-2 mb-10 p-1 bg-white/5 rounded-2xl w-fit border border-white/5">
-                    <button 
+                    <button
                         onClick={() => setActiveTab('rules')}
                         className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'rules' ? 'bg-brand-primary text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                     >
                         Sentinel Rules
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('notifications')}
                         className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notifications' ? 'bg-brand-secondary text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}
                     >
@@ -258,8 +286,8 @@ export default function Alerts() {
                                                     <div className="flex flex-col gap-1">
                                                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Threshold</label>
                                                         <div className="flex items-center gap-2">
-                                                            <input 
-                                                                type="number" 
+                                                            <input
+                                                                type="number"
                                                                 value={rule.threshold}
                                                                 onChange={(e) => updateThreshold(rule, e.target.value)}
                                                                 className="w-16 bg-obsidian-950 border border-white/5 rounded-xl px-2 py-2 text-xs font-mono font-black text-brand-primary focus:outline-none focus:border-brand-primary/50"
@@ -271,8 +299,8 @@ export default function Alerts() {
                                                     <div className="flex flex-col gap-1">
                                                         <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Cooldown</label>
                                                         <div className="flex items-center gap-2">
-                                                            <input 
-                                                                type="number" 
+                                                            <input
+                                                                type="number"
                                                                 value={rule.cooldownSeconds}
                                                                 onChange={(e) => updateCooldown(rule, e.target.value)}
                                                                 className="w-16 bg-obsidian-950 border border-white/5 rounded-xl px-2 py-2 text-xs font-mono font-black text-brand-secondary focus:outline-none focus:border-brand-secondary/50"
@@ -282,14 +310,14 @@ export default function Alerts() {
                                                     </div>
 
                                                     <div className="flex items-center gap-3">
-                                                        <button 
+                                                        <button
                                                             onClick={() => toggleRuleActive(rule)}
                                                             className={`w-12 h-6 rounded-full p-1 transition-all flex items-center ${rule.isActive ? 'bg-brand-primary shadow-[0_0_12px_rgba(167,139,250,0.4)]' : 'bg-slate-800'}`}
                                                         >
                                                             <div className={`w-4 h-4 rounded-full bg-white transition-all transform ${rule.isActive ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                                         </button>
 
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleUpdateRule(rule)}
                                                             disabled={isSaving === rule.id}
                                                             className="p-3 bg-white/5 hover:bg-brand-primary hover:text-white rounded-xl text-slate-400 transition-all group/btn"
@@ -311,16 +339,29 @@ export default function Alerts() {
                                 </div>
                             </>
                         ) : (
-                            <div className="space-y-10 animate-fade-in">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Send size={18} className="text-brand-secondary" />
-                                    <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Transmission Protocols</h3>
+                            <div className="space-y-16 animate-fade-in">
+                                <div className="flex items-center justify-between gap-3 mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-brand-secondary/10 flex items-center justify-center text-brand-secondary">
+                                            <Send size={20} />
+                                        </div>
+                                        <h3 className="text-base font-black text-white uppercase tracking-[0.2em]">Transmission Protocols</h3>
+                                    </div>
+                                    <button 
+                                        onClick={handleUpdateSettings}
+                                        disabled={isSavingSettings}
+                                        className="px-8 py-3 bg-indigo-600 hover:bg-white hover:text-indigo-600 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-3 shadow-[0_20px_40px_rgba(79,70,229,0.3)] hover:shadow-white/20 active:scale-95 disabled:opacity-50"
+                                    >
+                                        {isSavingSettings ? <Activity size={16} className="animate-spin" /> : <Save size={16} />}
+                                        Sync Protocols
+                                    </button>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
                                     {/* Telegram Settings */}
-                                    <div className="glass-panel rounded-3xl p-8 border-white/5 hover:border-brand-secondary/20 transition-all flex flex-col gap-6">
-                                        <div className="flex items-center justify-between">
+                                    <div className="glass-panel rounded-[40px] p-10 border-white/10 hover:border-sky-500/30 transition-all flex flex-col gap-10 bg-linear-to-br from-sky-500/5 to-transparent relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-sky-500/20 transition-all"></div>
+                                        <div className="flex items-center justify-between relative z-10">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
                                                     <Send size={18} />
@@ -367,7 +408,11 @@ export default function Alerts() {
                                                             <button 
                                                                 key={p.name}
                                                                 onClick={() => setSettings(s => s ? { ...s, telegramMessageTemplate: p.text } : null)}
-                                                                className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 hover:text-sky-400 hover:border-sky-500/30 transition-all uppercase tracking-tighter"
+                                                                className={`px-2 py-0.5 rounded border transition-all uppercase tracking-tighter text-[8px] font-black ${
+                                                                    normalizeTemplate(settings?.telegramMessageTemplate || '') === normalizeTemplate(p.text) 
+                                                                    ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' 
+                                                                    : 'bg-white/5 border-white/5 text-slate-500 hover:text-sky-400 hover:border-sky-500/30'
+                                                                }`}
                                                             >
                                                                 {p.name}
                                                             </button>
@@ -386,8 +431,9 @@ export default function Alerts() {
                                     </div>
 
                                     {/* Email Settings */}
-                                    <div className="glass-panel rounded-3xl p-8 border-white/5 hover:border-brand-secondary/20 transition-all flex flex-col gap-6">
-                                        <div className="flex items-center justify-between">
+                                    <div className="glass-panel rounded-[40px] p-10 border-white/10 hover:border-rose-500/30 transition-all flex flex-col gap-10 bg-linear-to-br from-rose-500/5 to-transparent relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 blur-[60px] rounded-full -mr-16 -mt-16 group-hover:bg-rose-500/20 transition-all"></div>
+                                        <div className="flex items-center justify-between relative z-10">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
                                                     <Mail size={18} />
@@ -454,7 +500,11 @@ export default function Alerts() {
                                                             <button 
                                                                 key={p.name}
                                                                 onClick={() => setSettings(s => s ? { ...s, emailMessageTemplate: p.text } : null)}
-                                                                className="px-2 py-0.5 rounded bg-white/5 border border-white/5 text-[8px] font-black text-slate-500 hover:text-rose-400 hover:border-rose-500/30 transition-all uppercase tracking-tighter"
+                                                                className={`px-2 py-0.5 rounded border transition-all uppercase tracking-tighter text-[8px] font-black ${
+                                                                    normalizeTemplate(settings?.emailMessageTemplate || '') === normalizeTemplate(p.text) 
+                                                                    ? 'bg-rose-500/20 border-rose-500/50 text-rose-400' 
+                                                                    : 'bg-white/5 border-white/5 text-slate-500 hover:text-rose-400 hover:border-rose-500/30'
+                                                                }`}
                                                             >
                                                                 {p.name}
                                                             </button>
@@ -474,46 +524,54 @@ export default function Alerts() {
                                 </div>
 
                                 {/* Placeholder Guide */}
-                                <div className="p-6 bg-white/5 rounded-3xl border border-white/5">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <Clock size={16} className="text-slate-500" />
-                                        <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Protocol Variable Glossary</h4>
+                                <div className="p-10 bg-white/2 rounded-[40px] border border-white/5 relative overflow-hidden">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-brand-secondary/5 blur-[100px] rounded-full pointer-events-none"></div>
+                                    <div className="flex flex-col items-center text-center gap-2 mb-10 relative z-10">
+                                        <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 mb-2">
+                                            <Clock size={20} />
+                                        </div>
+                                        <h4 className="text-xs font-black text-white uppercase tracking-[0.3em]">Protocol Variable Registry</h4>
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest max-w-sm leading-relaxed">
+                                            Inject dynamic runtime data into your transmission streams using the following identifiers
+                                        </p>
                                     </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 relative z-10">
                                         {[
-                                            { key: '{Metric}', desc: 'CPU, MEM, etc.' },
-                                            { key: '{Value}', desc: 'Current usage' },
-                                            { key: '{Threshold}', desc: 'Rule limit' },
-                                            { key: '{Time}', desc: 'UTC Timestamp' },
-                                            { key: '{Message}', desc: 'Default text' }
+                                            { key: '{Metric}', desc: 'Monitor Identity' },
+                                            { key: '{Value}', desc: 'Observed Magnitude' },
+                                            { key: '{Threshold}', desc: 'Activation Limit' },
+                                            { key: '{Time}', desc: 'Temporal Epoch' },
+                                            { key: '{Message}', desc: 'Summary Packet' }
                                         ].map(v => (
-                                            <div key={v.key} className="flex flex-col gap-1">
-                                                <code className="text-brand-accent text-[10px] font-black">{v.key}</code>
-                                                <span className="text-[9px] text-slate-500 uppercase font-bold">{v.desc}</span>
+                                            <div key={v.key} className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/3 border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all">
+                                                <code className="text-brand-accent text-[11px] font-black tracking-wider">{v.key}</code>
+                                                <span className="text-[8px] text-slate-500 uppercase font-black text-center tracking-tighter">{v.desc}</span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div className="flex justify-end">
-                                    <button 
-                                        onClick={handleUpdateSettings}
-                                        disabled={isSavingSettings}
-                                        className="px-10 py-5 bg-brand-secondary hover:bg-white hover:text-brand-secondary rounded-3xl text-[12px] font-black uppercase tracking-widest transition-all flex items-center gap-4 shadow-[0_15px_35px_rgba(20,184,166,0.3)] hover:shadow-white/20 active:scale-95 disabled:opacity-50"
-                                    >
-                                        {isSavingSettings ? <Activity size={18} className="animate-spin" /> : <Save size={18} />}
-                                        Commit Protocol Updates
-                                    </button>
-                                </div>
                             </div>
                         )}
                     </div>
 
                     {/* Alert History */}
-                    <div className="space-y-8">
-                        <div className="flex items-center gap-3 mb-2">
-                            <History size={18} className="text-brand-accent" />
-                            <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Incident Log</h3>
+                    <div className="space-y-12">
+                        <div className="flex items-center justify-between gap-3 mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-brand-accent/10 flex items-center justify-center text-brand-accent">
+                                    <History size={20} />
+                                </div>
+                                <h3 className="text-base font-black text-white uppercase tracking-[0.2em]">Incident Log</h3>
+                            </div>
+                            <button 
+                                onClick={() => setIsClearModalOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-rose-500/10 text-slate-500 hover:text-rose-500 rounded-xl transition-all border border-white/5 hover:border-rose-500/20 group"
+                                title="Clear all logs"
+                            >
+                                <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Clear Logs</span>
+                            </button>
                         </div>
 
                         <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
@@ -561,6 +619,31 @@ export default function Alerts() {
                     </div>
                 )}
             </main>
+
+            <Modal
+                isOpen={isClearModalOpen}
+                onClose={() => setIsClearModalOpen(false)}
+                title="Wipe Incident Log"
+                type="danger"
+                footer={
+                    <>
+                        <button 
+                            onClick={() => setIsClearModalOpen(false)}
+                            className="px-6 py-2 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all"
+                        >
+                            Abort Mission
+                        </button>
+                        <button 
+                            onClick={handleClearHistory}
+                            className="px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-[0_10px_20px_rgba(244,63,94,0.3)]"
+                        >
+                            Purge Records
+                        </button>
+                    </>
+                }
+            >
+                Are you absolutely sure you want to clear the entire alerting history? This action is irreversible and will remove all protocol logs from the database.
+            </Modal>
         </div>
     );
 }
