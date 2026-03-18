@@ -4,6 +4,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Documentation from './pages/Documentation';
 import Processes from './pages/Processes';
+import Alerts from './pages/Alerts';
+
 import Profile from './pages/Profile';
 import Sidebar from './components/Sidebar';
 import { authService } from './services/api';
@@ -24,6 +26,17 @@ function App() {
               <div className="flex">
                 <Sidebar />
                 <Dashboard />
+              </div>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/alerts" 
+          element={
+            <PrivateRoute>
+              <div className="flex">
+                <Sidebar />
+                <Alerts />
               </div>
             </PrivateRoute>
           } 

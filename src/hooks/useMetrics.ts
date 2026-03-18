@@ -13,6 +13,19 @@ export interface DockerContainerMetrics {
     blockIO: string;
 }
 
+export interface CpuMetrics {
+    totalUsagePercentage: number;
+    coreUsagePercentages: number[];
+    loadAverage: number[];
+}
+
+export interface MemoryMetrics {
+    totalRamBytes: number;
+    usedRamBytes: number;
+    freeRamBytes: number;
+    usagePercentage: number;
+}
+
 export interface DockerStats {
     totalContainers: number;
     runningContainers: number;
@@ -21,8 +34,8 @@ export interface DockerStats {
 }
 
 export interface ServerMetricsSnapshot {
-    cpu: any;
-    memory: any;
+    cpu: CpuMetrics;
+    memory: MemoryMetrics;
     disks: any[];
     networks: any[];
     systemInfo: any;

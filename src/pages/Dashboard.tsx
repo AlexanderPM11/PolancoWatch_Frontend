@@ -101,6 +101,44 @@ export default function Dashboard() {
                                 <div className="h-24 -mx-2">
                                      <MetricChart data={cpuHistory} color="#a78bfa" domain={[0, 100]} formatter={(v) => `${v.toFixed(0)}%`} />
                                 </div>
+
+                                {/* CPU Core Topology */}
+                                <div className="mt-8 pt-6 border-t border-white/5 relative z-10">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Core Topology</span>
+                                        <span className="text-[9px] font-black text-brand-primary uppercase tracking-widest">{metrics?.cpu?.coreUsagePercentages?.length || 0} Threads</span>
+                                    </div>
+                                    <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-4 xl:grid-cols-8 gap-2">
+                                        {metrics?.cpu?.coreUsagePercentages?.map((usage, i) => (
+                                            <div key={i} className="flex flex-col gap-1.5 group/core">
+                                                <div className="h-10 w-full bg-white/5 rounded-md overflow-hidden relative border border-white/5 shadow-inner">
+                                                    <div 
+                                                        className={`absolute bottom-0 left-0 w-full transition-all duration-1000 ease-out ${
+                                                            usage > 80 ? 'bg-brand-accent' : 
+                                                            usage > 50 ? 'bg-amber-500' : 'bg-brand-primary'
+                                                        }`}
+                                                        style={{ height: `${Math.max(usage, 5)}%`, opacity: 0.7 + (usage / 300) }}
+                                                    ></div>
+                                                </div>
+                                                <span className="text-[7px] font-mono text-slate-600 text-center font-bold">{usage.toFixed(0)}%</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    {/* Load Average */}
+                                    {metrics?.cpu?.loadAverage && metrics.cpu.loadAverage.some(l => l > 0) && (
+                                        <div className="mt-6 flex items-center justify-between bg-white/[0.03] p-2 rounded-xl border border-white/5">
+                                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Load Average</span>
+                                            <div className="flex gap-3 text-[9px] font-black font-mono text-white">
+                                                <span>{metrics.cpu.loadAverage[0].toFixed(2)}</span>
+                                                <span className="opacity-30">|</span>
+                                                <span>{metrics.cpu.loadAverage[1].toFixed(2)}</span>
+                                                <span className="opacity-30">|</span>
+                                                <span>{metrics.cpu.loadAverage[2].toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* RAM Card */}

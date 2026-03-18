@@ -60,4 +60,19 @@ export const dockerService = {
   }
 };
 
+export const alertsService = {
+  getRules: async () => {
+    const response = await api.get('/api/alerts/rules');
+    return response.data;
+  },
+  updateRule: async (rule: any) => {
+    const response = await api.post('/api/alerts/rules', rule);
+    return response.data;
+  },
+  getHistory: async () => {
+    const response = await api.get('/api/alerts/history');
+    return response.data;
+  }
+};
+
 export default api;

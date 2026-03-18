@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Activity, Terminal } from 'lucide-react';
+import { Box, CheckCircle2, XCircle, AlertCircle, Play, Square, RotateCcw, Image, Database, Trash2, Terminal, Search, Filter } from 'lucide-react';
 import Modal from './Modal';
 import { LogViewer } from './LogViewer';
 import type { DockerContainerMetrics, DockerStats } from '../hooks/useMetrics';
@@ -7,7 +7,7 @@ import { dockerService } from '../services/api';
 
 interface DockerPanelProps {
     containers: DockerContainerMetrics[];
-    stats?: DockerStats; // Made optional for safety
+    stats?: DockerStats;
 }
 
 type FilterStatus = 'all' | 'running' | 'stopped' | 'failed';
@@ -16,6 +16,7 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
     const [filter, setFilter] = useState<FilterStatus>('all');
     const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
     const [selectedLogContainer, setSelectedLogContainer] = useState<{ id: string, name: string } | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const handleAction = async (id: string, action: 'start' | 'stop' | 'restart') => {
         setLoadingIds(prev => new Set(prev).add(id));
@@ -25,7 +26,6 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
             else if (action === 'restart') await dockerService.restartContainer(id);
         } catch (error) {
             console.error(`Failed to ${action} container:`, error);
-            // Optionally add toast notification here
         } finally {
             setLoadingIds(prev => {
                 const next = new Set(prev);
@@ -36,11 +36,15 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
     };
 
     const filteredContainers = (containers || []).filter(c => {
-        if (filter === 'all') return true;
-        if (filter === 'running') return c.state === 'running';
-        if (filter === 'stopped') return (c.state === 'exited' || c.state === 'created') && !c.status.toLowerCase().includes('exit (1)');
-        if (filter === 'failed') return c.status.toLowerCase().includes('exit') && !c.status.includes('exit (0)');
-        return true;
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              c.containerId.toLowerCase().includes(searchTerm.toLowerCase());
+
+        let matchesTabFilter = true;
+        if (filter === 'running') matchesTabFilter = c.state === 'running';
+        else if (filter === 'stopped') matchesTabFilter = (c.state === 'exited' || c.state === 'created') && !c.status.toLowerCase().includes('exit (1)');
+        else if (filter === 'failed') matchesTabFilter = c.status.toLowerCase().includes('exit') && !c.status.includes('exit (0)');
+        
+        return matchesSearch && matchesTabFilter;
     });
 
     const localStats = {
@@ -49,11 +53,6 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
         stopped: containers?.filter(c => (c.state === 'exited' || c.state === 'created') && !c.status.toLowerCase().includes('exit (1)')).length || 0,
         failed: containers?.filter(c => c.status.toLowerCase().includes('exit') && !c.status.includes('exit (0)')).length || 0
     };
-
-    // If no containers and no global stats (or all 0), don't show the panel
-    if (localStats.all === 0 && (!globalStats || globalStats.totalContainers === 0)) {
-        return null;
-    }
 
     const Tab = ({ id, label, count, icon: Icon }: { id: FilterStatus, label: string, count: number, icon: any }) => (
         <button
@@ -89,7 +88,7 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
                 </div>
                 <div className="glass-card p-6 rounded-3xl border-white/5 flex items-center gap-4 bg-linear-to-br from-brand-secondary/5 to-transparent">
                     <div className="w-12 h-12 rounded-2xl bg-brand-secondary/10 flex items-center justify-center border border-brand-secondary/20">
-                        <Activity size={20} className="text-brand-secondary" />
+                        <CheckCircle2 size={20} className="text-brand-secondary" />
                     </div>
                     <div>
                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-tight">Running</span>
@@ -117,30 +116,43 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
             </div>
 
             <div className="glass-card rounded-4xl p-8 border-white/5">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-brand-primary/10 rounded-2xl flex items-center justify-center border border-brand-primary/20 shadow-inner">
-                            <Box size={24} className="text-brand-primary" />
+                <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-8">
+                    <div>
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-widest mb-6">
+                            <Box size={12} /> Container Orchestration
                         </div>
-                        <div>
-                            <h3 className="text-lg font-black text-white tracking-tight">Docker Fleet</h3>
-                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none mt-1">Container Management</p>
-                        </div>
+                        <h1 className="text-4xl font-black text-white tracking-tighter mb-4 italic">Docker <span className="text-brand-primary">Engine</span></h1>
+                        <p className="text-slate-400 max-w-xl text-sm leading-relaxed uppercase tracking-tight">
+                            Direct interface for container lifecycle management. Monitor resources and execute kernel-level operations in real-time.
+                        </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Tab id="all" label="All" count={localStats.all} icon={Box} />
-                        <Tab id="running" label="Active" count={localStats.running} icon={CheckCircle2} />
-                        <Tab id="stopped" label="Stopped" count={localStats.stopped} icon={XCircle} />
-                        <Tab id="failed" label="Failed" count={localStats.failed} icon={AlertCircle} />
+                    <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto">
+                        <div className="relative w-full md:w-64 group">
+                            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-primary transition-colors" />
+                            <input 
+                                type="text" 
+                                placeholder="Search containers..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full bg-obsidian-900/50 border border-white/5 rounded-2xl pl-10 pr-4 py-3 text-[11px] font-black uppercase tracking-widest text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-primary/30 transition-all"
+                            />
+                        </div>
                     </div>
+                </header>
+
+                <div className="flex flex-wrap gap-2 mb-8">
+                    <Tab id="all" label="All" count={localStats.all} icon={Box} />
+                    <Tab id="running" label="Active" count={localStats.running} icon={CheckCircle2} />
+                    <Tab id="stopped" label="Stopped" count={localStats.stopped} icon={XCircle} />
+                    <Tab id="failed" label="Failed" count={localStats.failed} icon={AlertCircle} />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
                     {filteredContainers.map((container) => (
                         <div 
                             key={container.containerId} 
-                            className="p-6 rounded-3xl bg-white/2 border border-white/5 hover:bg-white/4 transition-all group relative overflow-hidden flex flex-col justify-between h-full"
+                            className="p-6 rounded-3xl bg-white/2 border border-white/5 hover:bg-white/4 transition-all group relative overflow-hidden flex flex-col justify-between"
                         >
                             {/* Status Indicator Bar */}
                             <div className={`absolute top-0 left-0 w-full h-1 ${
@@ -208,7 +220,7 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
                                         <button 
                                             onClick={() => handleAction(container.containerId, 'start')}
                                             disabled={loadingIds.has(container.containerId)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-secondary/10 border border-brand-secondary/20 text-brand-secondary hover:bg-brand-secondary/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-secondary/10 border border-brand-secondary/20 text-brand-secondary hover:bg-brand-secondary/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50 shadow-inner"
                                         >
                                             <Play size={10} fill="currentColor" />
                                             Start
@@ -217,7 +229,7 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
                                         <button 
                                             onClick={() => handleAction(container.containerId, 'stop')}
                                             disabled={loadingIds.has(container.containerId)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-accent/10 border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-accent/10 border border-brand-accent/20 text-brand-accent hover:bg-brand-accent/20 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50 shadow-inner"
                                         >
                                             <Square size={10} fill="currentColor" />
                                             Stop
@@ -226,14 +238,14 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
                                     <button 
                                         onClick={() => handleAction(container.containerId, 'restart')}
                                         disabled={loadingIds.has(container.containerId)}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all text-[9px] font-black uppercase tracking-widest disabled:opacity-50 shadow-inner"
                                     >
                                         <RotateCcw size={10} />
                                         Restart
                                     </button>
                                     <button 
                                         onClick={() => setSelectedLogContainer({ id: container.containerId, name: container.name })}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 transition-all text-[9px] font-black uppercase tracking-widest"
+                                        className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-brand-primary/10 border border-brand-primary/20 text-brand-primary hover:bg-brand-primary/20 transition-all text-[9px] font-black uppercase tracking-widest shadow-inner"
                                     >
                                         <Terminal size={10} />
                                         Logs
@@ -255,8 +267,7 @@ export const DockerPanel: React.FC<DockerPanelProps> = ({ containers, stats: glo
             <Modal
                 isOpen={!!selectedLogContainer}
                 onClose={() => setSelectedLogContainer(null)}
-                title={`Container logs: ${selectedLogContainer?.name || ''}`}
-                type="info"
+                title={selectedLogContainer ? `Kernel Output: ${selectedLogContainer.name}` : ''}
             >
                 {selectedLogContainer && (
                     <LogViewer 
