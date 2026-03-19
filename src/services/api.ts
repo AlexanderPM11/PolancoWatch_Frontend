@@ -84,6 +84,13 @@ export const alertsService = {
   }
 };
 
+export const metricsService = {
+  getHistory: async (durationHours: number = 24) => {
+    const response = await api.get(`/api/metrics/history?durationHours=${durationHours}`);
+    return response.data;
+  }
+};
+
 export const settingsService = {
   getNotificationSettings: async () => {
     const response = await api.get('/api/settings/notifications');

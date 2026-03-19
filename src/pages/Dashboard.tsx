@@ -6,16 +6,42 @@ import { Activity, Cpu, HardDrive, Network, Server, MemoryStick } from 'lucide-r
 import { MetricChart } from '../components/MetricChart';
 import { DockerPanel } from '../components/DockerPanel';
 import { DashboardSkeleton } from '../components/DashboardSkeleton';
+import { metricsService } from '../services/api';
+import { useState } from 'react';
+import { History } from 'lucide-react';
 
 export default function Dashboard() {
     const navigate = useNavigate();
     const { metrics, isConnected, alerts, cpuHistory, memoryHistory, networkInHistory, networkOutHistory } = useMetrics();
+    const [viewMode, setViewMode] = useState<'live' | 'history'>('live');
+    const [historicalData, setHistoricalData] = useState<any[]>([]);
 
     useEffect(() => {
         if (!authService.isAuthenticated()) {
             navigate('/login');
         }
     }, [navigate]);
+
+    useEffect(() => {
+        if (viewMode === 'history') {
+            fetchHistory();
+        }
+    }, [viewMode]);
+
+    const fetchHistory = async () => {
+        try {
+            const data = await metricsService.getHistory(24);
+            const formatted = data.map((d: any) => ({
+                timestamp: new Date(d.timestamp),
+                cpu: d.cpuUsage,
+                memory: d.memoryUsage,
+                disk: d.diskUsage
+            }));
+            setHistoricalData(formatted);
+        } catch (err) {
+            console.error("Failed to fetch history", err);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-obsidian-950 text-slate-300 font-sans selection:bg-brand-primary/30 flex-1 pl-0 lg:pl-20 xl:pl-72 transition-all duration-500">
@@ -31,7 +57,22 @@ export default function Dashboard() {
                         <h1 className="text-4xl font-black text-white tracking-tighter">System <span className="text-brand-primary">Overview</span></h1>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
+                            <button 
+                                onClick={() => setViewMode('live')}
+                                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'live' ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <Activity size={14} /> LIVE
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('history')}
+                                className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${viewMode === 'history' ? 'bg-brand-primary text-white shadow-[0_0_15px_rgba(139,92,246,0.5)]' : 'text-slate-400 hover:text-white'}`}
+                            >
+                                <History size={14} /> 24H_HISTORY
+                            </button>
+                        </div>
+
                         <div className="flex flex-col text-right">
                             <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Connection Status</span>
                             {isConnected ? (
@@ -99,7 +140,12 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="h-24 -mx-2">
-                                     <MetricChart data={cpuHistory} color="#a78bfa" domain={[0, 100]} formatter={(v) => `${v.toFixed(0)}%`} />
+                                     <MetricChart 
+                                        data={viewMode === 'live' ? cpuHistory : historicalData.map(d => ({ timestamp: d.timestamp, value: d.cpu }))} 
+                                        color="#a78bfa" 
+                                        domain={[0, 100]} 
+                                        formatter={(v) => `${v.toFixed(0)}%`} 
+                                     />
                                 </div>
 
                                 {/* CPU Core Topology */}
@@ -161,7 +207,12 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="h-24 -mx-2">
-                                    <MetricChart data={memoryHistory} color="#22d3ee" domain={[0, 100]} formatter={(v) => `${v.toFixed(0)}%`} />
+                                    <MetricChart 
+                                        data={viewMode === 'live' ? memoryHistory : historicalData.map(d => ({ timestamp: d.timestamp, value: d.memory }))} 
+                                        color="#22d3ee" 
+                                        domain={[0, 100]} 
+                                        formatter={(v) => `${v.toFixed(0)}%`} 
+                                    />
                                 </div>
                             </div>
 
