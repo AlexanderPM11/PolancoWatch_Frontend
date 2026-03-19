@@ -1,4 +1,6 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface DataPoint {
     timestamp: Date;
@@ -53,7 +55,16 @@ export function MetricChart({ data, color, domain = [0, 100], formatter = (val) 
                             backdropFilter: 'blur(10px)'
                         }}
                         itemStyle={{ color: color, padding: 0 }}
-                        labelStyle={{ display: 'none' }}
+                        labelStyle={{ 
+                            display: 'block', 
+                            marginBottom: '6px', 
+                            color: 'rgba(255,255,255,0.7)', 
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            borderBottom: '1px solid rgba(255,255,255,0.1)',
+                            paddingBottom: '4px'
+                        }}
+                        labelFormatter={(label) => format(new Date(label), "d 'de' MMMM 'de' yyyy, HH:mm:ss", { locale: es })}
                         cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
                         formatter={(value: any) => [formatter(value), '']}
                     />
