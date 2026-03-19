@@ -95,7 +95,11 @@ export default function Login() {
                                         if (res.success) {
                                             setSuccessMessage(`SUCCESS: ${res.message}`);
                                         } else {
-                                            setError(`ERROR: ${res.message}`);
+                                            if (res.message.includes('ERROR_COOLDOWN_ACTIVE')) {
+                                                setError('SECURITY_PROTOCOL_COOLDOWN: PLEASE WAIT A FEW MINUTES BEFORE RETRYING.');
+                                            } else {
+                                                setError(`ERROR: ${res.message}`);
+                                            }
                                         }
                                     } catch (err: any) {
                                         setError('CRITICAL_FAILURE: UNABLE TO CONTACT SECURITY BROKER.');
