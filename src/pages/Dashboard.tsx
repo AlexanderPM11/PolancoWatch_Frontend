@@ -44,13 +44,8 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-obsidian-950 text-slate-300 font-sans selection:bg-brand-primary/30 flex-1 pl-0 lg:pl-20 xl:pl-72 transition-all duration-500">
-            {/* Background Texture Overlay */}
-            <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0" 
-                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
-            </div>
-
-            <main className="max-w-7xl mx-auto px-6 lg:px-8 py-12 relative z-10 space-y-8">
+        <div className="w-full">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10 space-y-8">
                 <header className="flex justify-between items-center mb-12">
                      <div className="flex flex-col">
                         <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold mb-1">Live Console</span>
@@ -224,17 +219,17 @@ export default function Dashboard() {
                                         <Network size={14} className="text-brand-secondary" /> Real-time Throughput
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-2 gap-10 relative z-10">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 relative z-10">
                                     <div>
                                         <div className="flex items-center gap-2 mb-3">
                                             <span className="w-2 h-2 rounded-full bg-brand-secondary animate-pulse shadow-[0_0_12px_rgba(34,211,238,0.8)]"></span>
                                             <p className="text-[10px] text-slate-300 uppercase tracking-widest font-black">Inbound</p>
                                         </div>
-                                        <div className="flex items-baseline gap-1 mb-4">
-                                            <p className="text-5xl font-black font-mono text-white tracking-tighter drop-shadow-2xl">
+                                        <div className="flex items-baseline gap-1 mb-4 flex-wrap">
+                                            <p className="text-3xl sm:text-4xl lg:text-5xl font-black font-mono text-white tracking-tighter drop-shadow-2xl">
                                                 {((metrics?.networks?.[0]?.incomingBytesPerSecond || 0) / 1024 / 1024).toFixed(2)}
                                             </p>
-                                            <span className="text-sm font-black text-brand-secondary">MB/s</span>
+                                            <span className="text-[10px] sm:text-sm font-black text-brand-secondary">MB/s</span>
                                         </div>
                                         <div className="h-20">
                                             <MetricChart data={networkInHistory} color="#22d3ee" domain={['auto', 'auto']} formatter={(v) => `${v.toFixed(1)}`} />
@@ -245,11 +240,11 @@ export default function Dashboard() {
                                             <p className="text-[10px] text-slate-300 uppercase tracking-widest font-black">Outbound</p>
                                             <span className="w-2 h-2 rounded-full bg-brand-primary animate-pulse shadow-[0_0_12px_rgba(167,139,250,0.8)]"></span>
                                         </div>
-                                        <div className="flex items-baseline gap-1 mb-4 justify-end">
-                                            <p className="text-5xl font-black font-mono text-white tracking-tighter drop-shadow-2xl">
+                                        <div className="flex items-baseline gap-1 mb-4 justify-end flex-wrap">
+                                            <p className="text-3xl sm:text-4xl lg:text-5xl font-black font-mono text-white tracking-tighter drop-shadow-2xl text-right">
                                                 {((metrics?.networks?.[0]?.outgoingBytesPerSecond || 0) / 1024 / 1024).toFixed(2)}
                                             </p>
-                                            <span className="text-sm font-black text-brand-primary">MB/s</span>
+                                            <span className="text-[10px] sm:text-sm font-black text-brand-primary">MB/s</span>
                                         </div>
                                         <div className="h-20">
                                             <MetricChart data={networkOutHistory} color="#a78bfa" domain={['auto', 'auto']} formatter={(v) => `${v.toFixed(1)}`} />

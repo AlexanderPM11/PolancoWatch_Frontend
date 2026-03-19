@@ -44,13 +44,8 @@ export default function Profile() {
     };
 
     return (
-        <div className="min-h-screen bg-obsidian-950 text-slate-300 font-sans selection:bg-brand-primary/30 flex-1 pl-0 lg:pl-20 xl:pl-72 transition-all duration-500">
-            {/* Background Texture Overlay */}
-            <div className="fixed inset-0 pointer-events-none opacity-[0.03] z-0" 
-                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}>
-            </div>
-
-            <main className="max-w-4xl mx-auto px-6 lg:px-8 py-16 relative z-10">
+        <div className="w-full">
+            <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
                 <header className="mb-12">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-secondary/10 border border-brand-secondary/20 text-brand-secondary text-[10px] font-black uppercase tracking-widest mb-6">
                         <Fingerprint size={12} /> Identity Management

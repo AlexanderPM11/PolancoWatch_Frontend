@@ -232,7 +232,8 @@ export default function WebMonitors() {
     );
 
     return (
-        <main className="flex-1 min-h-screen bg-obsidian-950 p-8 lg:p-12 overflow-y-auto">
+        <div className="w-full">
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
             <div className="max-w-7xl mx-auto space-y-12">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -408,5 +409,6 @@ export default function WebMonitors() {
                 </div>
             )}
         </main>
+        </div>
     );
 }
