@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
 
 export default function Login() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setSuccessMessage('');
         setLoading(true);
 
         try {
@@ -44,6 +46,11 @@ export default function Login() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                    {successMessage && (
+                        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase text-center animate-fade-in">
+                            {successMessage}
+                        </div>
+                    )}
                     {error && (
                         <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-black uppercase text-center animate-fade-in">
                             {error}
@@ -73,9 +80,33 @@ export default function Login() {
                             required
                         />
                         <div className="flex justify-end mt-2">
-                            <Link to="/forgot-password" title="Forgotten_Security_Key?" className="text-[9px] text-slate-500 hover:text-brand-primary font-black uppercase tracking-widest transition-colors">
+                            <button 
+                                type="button"
+                                onClick={async () => {
+                                    if (!username) {
+                                        setError('IDENTITY_HANDLE_REQUIRED: PLEASE ENTER USERNAME FIRST.');
+                                        return;
+                                    }
+                                    setLoading(true);
+                                    setError('');
+                                    setSuccessMessage('');
+                                    try {
+                                        const res = await authService.forgotPassword(undefined, username);
+                                        if (res.success) {
+                                            setSuccessMessage(`SUCCESS: ${res.message}`);
+                                        } else {
+                                            setError(`ERROR: ${res.message}`);
+                                        }
+                                    } catch (err: any) {
+                                        setError('CRITICAL_FAILURE: UNABLE TO CONTACT SECURITY BROKER.');
+                                    } finally {
+                                        setLoading(false);
+                                    }
+                                }}
+                                className="text-[9px] text-slate-500 hover:text-brand-primary font-black uppercase tracking-widest transition-colors cursor-pointer bg-transparent border-none p-0"
+                            >
                                 Forgotten_Security_Key?
-                            </Link>
+                            </button>
                         </div>
                     </div>
 

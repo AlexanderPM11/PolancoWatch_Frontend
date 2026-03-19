@@ -16,9 +16,17 @@ export default function ForgotPassword() {
 
         try {
             const res = await authService.forgotPassword(email);
-            setMessage(res.message || 'The recovery link has been dispatched to the configured Telegram Bot.');
+            if (!res.success) {
+                if (res.message === 'ERROR_TELEGRAM_NOT_CONFIGURED') {
+                    setError('CRITICAL_SYSTEM_ERROR: TELEGRAM_BROKER_NOT_CONFIGURED. Protocol failed.');
+                } else {
+                    setError(res.message || 'System failed to dispatch link.');
+                }
+            } else {
+                setMessage(res.message || 'The recovery link has been dispatched to your Telegram Bot.');
+            }
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Something went wrong. Please try again.');
+            setError(err.response?.data?.message || 'CRITICAL: DISPATCH_FAILURE. Check system logs.');
         } finally {
             setLoading(false);
         }
