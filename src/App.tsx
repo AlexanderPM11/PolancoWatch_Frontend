@@ -9,6 +9,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 
 import Profile from './pages/Profile';
+import WebMonitors from './pages/WebMonitors';
 import Sidebar from './components/Sidebar';
 import { authService } from './services/api';
 
@@ -17,6 +18,17 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  const [collapsed, setCollapsed] = React.useState(false);
+
+  const Layout = ({ children }: { children: React.ReactNode }) => (
+    <div className="flex bg-obsidian-950 min-h-screen">
+      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      <div className={`flex-1 transition-all duration-500 ${collapsed ? 'pl-20' : 'pl-72'}`}>
+        {children}
+      </div>
+    </div>
+  );
+
   return (
     <BrowserRouter>
       <Routes>
@@ -27,10 +39,9 @@ function App() {
           path="/" 
           element={
             <PrivateRoute>
-              <div className="flex">
-                <Sidebar />
+              <Layout>
                 <Dashboard />
-              </div>
+              </Layout>
             </PrivateRoute>
           } 
         />
@@ -38,10 +49,9 @@ function App() {
           path="/alerts" 
           element={
             <PrivateRoute>
-              <div className="flex">
-                <Sidebar />
+              <Layout>
                 <Alerts />
-              </div>
+              </Layout>
             </PrivateRoute>
           } 
         />
@@ -49,10 +59,9 @@ function App() {
           path="/processes" 
           element={
             <PrivateRoute>
-              <div className="flex">
-                <Sidebar />
+              <Layout>
                 <Processes />
-              </div>
+              </Layout>
             </PrivateRoute>
           } 
         />
@@ -60,10 +69,19 @@ function App() {
           path="/documentation" 
           element={
             <PrivateRoute>
-              <div className="flex">
-                <Sidebar />
+              <Layout>
                 <Documentation />
-              </div>
+              </Layout>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/web-monitors" 
+          element={
+            <PrivateRoute>
+              <Layout>
+                <WebMonitors />
+              </Layout>
             </PrivateRoute>
           } 
         />
@@ -71,10 +89,9 @@ function App() {
           path="/profile" 
           element={
             <PrivateRoute>
-              <div className="flex">
-                <Sidebar />
+              <Layout>
                 <Profile />
-              </div>
+              </Layout>
             </PrivateRoute>
           } 
         />

@@ -47,10 +47,14 @@ const SidebarItem = ({ icon, label, isActive, collapsed, onClick }: SidebarItemP
     </button>
 );
 
-export default function Sidebar() {
+interface SidebarProps {
+    collapsed: boolean;
+    setCollapsed: (collapsed: boolean) => void;
+}
+
+export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
     const navigate = useNavigate();
     const location = useLocation();
-    const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
     const handleNavigate = (path: string) => {
@@ -61,6 +65,7 @@ export default function Sidebar() {
     const menuItems = [
         { icon: <LayoutDashboard size={20} />, label: 'Console', path: '/' },
         { icon: <Activity size={20} />, label: 'Alerts', path: '/alerts' },
+        { icon: <ShieldCheck size={20} />, label: 'Web Monitors', path: '/web-monitors' },
         { icon: <Cpu size={20} />, label: 'Processes', path: '/processes' },
         { icon: <User size={20} />, label: 'Profile', path: '/profile' },
         { icon: <BookOpen size={20} />, label: 'Documentation', path: '/documentation' },

@@ -44,7 +44,6 @@ class SignalRService {
 
     this.startPromise = conn.start()
       .then(() => {
-        console.log("Connected to PolancoWatch SignalR Hub");
       })
       .catch(err => {
         if (err.name !== 'AbortError') {

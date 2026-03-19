@@ -102,4 +102,35 @@ export const settingsService = {
   }
 };
 
+export interface WebMonitor {
+  id: number;
+  name: string;
+  url: string;
+  checkIntervalSeconds: number;
+  isActive: boolean;
+  lastCheckTime?: string;
+  lastStatusUp: boolean;
+  lastLatencyMs: number;
+}
+
+export interface WebCheck {
+  id: number;
+  webMonitorId: number;
+  timestamp: string;
+  isUp: boolean;
+  latencyMs: number;
+  statusCode: number;
+  errorMessage?: string;
+}
+
+export const webMonitorService = {
+  getMonitors: () => api.get<WebMonitor[]>('/api/webmonitors').then(res => res.data),
+  getMonitor: (id: number) => api.get<WebMonitor>(`/api/webmonitors/${id}`).then(res => res.data),
+  getHistory: (id: number, limit = 50) => api.get<WebCheck[]>(`/api/webmonitors/${id}/history?limit=${limit}`).then(res => res.data),
+  createMonitor: (monitor: Partial<WebMonitor>) => api.post<WebMonitor>('/api/webmonitors', monitor).then(res => res.data),
+  updateMonitor: (id: number, data: Partial<WebMonitor>) => api.put(`/api/webmonitors/${id}`, data).then(res => res.data),
+  deleteMonitor: (id: number) => api.delete(`/api/webmonitors/${id}`),
+  toggleMonitor: (id: number) => api.post<{ isActive: boolean }>(`/api/webmonitors/${id}/toggle`).then(res => res.data),
+};
+
 export default api;
