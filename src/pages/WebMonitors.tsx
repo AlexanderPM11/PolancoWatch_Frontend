@@ -17,6 +17,13 @@ import {
 import { webMonitorService } from '../services/api';
 import type { WebMonitor, WebCheck } from '../services/api';
 
+const formatInterval = (seconds: number): string => {
+    if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400}d`;
+    if (seconds >= 3600 && seconds % 3600 === 0) return `${seconds / 3600}h`;
+    if (seconds >= 60 && seconds % 60 === 0) return `${seconds / 60}m`;
+    return `${seconds}s`;
+};
+
 const StatusBadge = ({ up }: { up: boolean }) => (
     <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
         up 
@@ -83,7 +90,7 @@ const MonitorCard = ({ monitor, onDelete, onToggle, onEdit }: {
                         Interval
                     </div>
                     <div className="text-xl font-black text-white">
-                        {monitor.checkIntervalSeconds}s
+                        {formatInterval(monitor.checkIntervalSeconds)}
                     </div>
                 </div>
             </div>
@@ -144,8 +151,11 @@ export default function WebMonitors() {
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingMonitor, setEditingMonitor] = useState<WebMonitor | null>(null);
-    const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 60 });
+    const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 1 });
+    const [intervalUnit, setIntervalUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('minutes');
     const [searchQuery, setSearchQuery] = useState('');
+
+    const unitToSeconds = { seconds: 1, minutes: 60, hours: 3600, days: 86400 };
 
     const fetchMonitors = async () => {
         try {
@@ -166,19 +176,20 @@ export default function WebMonitors() {
 
     const handleAddMonitor = async (e: React.FormEvent) => {
         e.preventDefault();
+        const intervalSeconds = newMonitor.interval * unitToSeconds[intervalUnit];
         try {
             if (editingMonitor) {
                 await webMonitorService.updateMonitor(editingMonitor.id, {
                     ...editingMonitor,
                     name: newMonitor.name,
                     url: newMonitor.url,
-                    checkIntervalSeconds: newMonitor.interval
+                    checkIntervalSeconds: intervalSeconds
                 });
             } else {
                 await webMonitorService.createMonitor({
                     name: newMonitor.name,
                     url: newMonitor.url,
-                    checkIntervalSeconds: newMonitor.interval,
+                    checkIntervalSeconds: intervalSeconds,
                     isActive: true
                 });
             }
@@ -193,10 +204,17 @@ export default function WebMonitors() {
 
     const handleEdit = (monitor: WebMonitor) => {
         setEditingMonitor(monitor);
+        // Convert stored seconds back to a friendly unit
+        let unit: 'seconds' | 'minutes' | 'hours' | 'days' = 'seconds';
+        let val = monitor.checkIntervalSeconds;
+        if (val % 86400 === 0) { unit = 'days'; val = val / 86400; }
+        else if (val % 3600 === 0) { unit = 'hours'; val = val / 3600; }
+        else if (val % 60 === 0) { unit = 'minutes'; val = val / 60; }
+        setIntervalUnit(unit);
         setNewMonitor({
             name: monitor.name,
             url: monitor.url,
-            interval: monitor.checkIntervalSeconds
+            interval: val
         });
         setShowAddModal(true);
     };
@@ -204,7 +222,8 @@ export default function WebMonitors() {
     const handleCloseModal = () => {
         setShowAddModal(false);
         setEditingMonitor(null);
-        setNewMonitor({ name: '', url: '', interval: 60 });
+        setNewMonitor({ name: '', url: '', interval: 1 });
+        setIntervalUnit('minutes');
     };
 
     const handleDelete = async (id: number) => {
@@ -377,16 +396,27 @@ export default function WebMonitors() {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Check Interval (Seconds)</label>
-                                <input 
-                                    required
-                                    type="number"
-                                    min="30"
-                                    max="3600"
-                                    value={newMonitor.interval}
-                                    onChange={e => setNewMonitor({...newMonitor, interval: parseInt(e.target.value)})}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-hidden focus:border-brand-primary/50 transition-all font-medium"
-                                />
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Check Interval</label>
+                                <div className="flex gap-3">
+                                    <input 
+                                        required
+                                        type="number"
+                                        min="1"
+                                        value={newMonitor.interval}
+                                        onChange={e => setNewMonitor({...newMonitor, interval: parseInt(e.target.value) || 1})}
+                                        className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-hidden focus:border-brand-primary/50 transition-all font-medium"
+                                    />
+                                    <select
+                                        value={intervalUnit}
+                                        onChange={e => setIntervalUnit(e.target.value as typeof intervalUnit)}
+                                        className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-brand-primary/50 transition-all font-medium text-sm cursor-pointer"
+                                    >
+                                        <option value="seconds" className="bg-obsidian-900">Seconds</option>
+                                        <option value="minutes" className="bg-obsidian-900">Minutes</option>
+                                        <option value="hours" className="bg-obsidian-900">Hours</option>
+                                        <option value="days" className="bg-obsidian-900">Days</option>
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="flex gap-4 pt-4">
