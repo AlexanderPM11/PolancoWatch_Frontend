@@ -16,7 +16,7 @@ export default function ForgotPassword() {
 
         try {
             const res = await authService.forgotPassword(email);
-            setMessage(res.message || 'If that email is registered, you will receive a reset link shortly.');
+            setMessage(res.message || 'The recovery link has been dispatched to the configured Telegram Bot.');
         } catch (err: any) {
             setError(err.response?.data?.message || 'Something went wrong. Please try again.');
         } finally {
