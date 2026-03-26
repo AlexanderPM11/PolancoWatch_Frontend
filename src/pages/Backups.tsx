@@ -655,12 +655,19 @@ const Backups = () => {
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
                         <span className="text-xs font-black text-white tracking-tight uppercase">{backup.name}</span>
+                        {backup.status === 1 && (
+                          <span className="text-[9px] text-brand-primary/80 font-bold uppercase mt-1 flex items-center gap-1">
+                            <Loader2 size={10} className="animate-spin" /> {progress[backup.id]?.message || 'PROCESSING...'} {progress[backup.id] ? `(${progress[backup.id].percentage}%)` : ''}
+                          </span>
+                        )}
                         {backup.status === 3 && backup.errorMessage && (
                           <span className="text-[9px] text-rose-400/80 font-bold uppercase mt-1 flex items-center gap-1">
                             <AlertCircle size={10} /> {backup.errorMessage}
                           </span>
                         )}
-                        <span className="text-[10px] text-slate-500 font-bold truncate max-w-[200px] mt-1">{backup.filePath}</span>
+                        {backup.filePath && (
+                          <span className="text-[10px] text-slate-500 font-bold truncate max-w-[200px] mt-1">{backup.filePath}</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-8 py-5">
