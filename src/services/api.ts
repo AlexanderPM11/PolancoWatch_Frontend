@@ -146,6 +146,7 @@ export interface BackupService {
   getAvailableVolumes: () => Promise<{ name: string, path: string }[]>;
   getDriveStatus: () => Promise<{ isAuthenticated: boolean }>;
   getDriveAuthUrl: () => Promise<{ url: string }>;
+  revokeDriveAuth: () => Promise<any>;
 }
 
 export const backupService: BackupService = {
@@ -172,6 +173,7 @@ export const backupService: BackupService = {
   getAvailableVolumes: () => api.get<{ name: string, path: string }[]>('/api/backups/config/volumes').then(res => res.data),
   getDriveStatus: () => api.get<{ isAuthenticated: boolean }>('/api/backups/drive/status').then(res => res.data),
   getDriveAuthUrl: () => api.get<{ url: string }>('/api/backups/drive/auth-url').then(res => res.data),
+  revokeDriveAuth: () => api.delete('/api/backups/drive/auth').then(res => res.data),
 };
 
 export default api;

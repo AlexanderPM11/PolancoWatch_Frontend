@@ -46,6 +46,8 @@ interface BackupSchedule {
   intervalMinutes: number;
   isActive: boolean;
   syncToCloud: boolean;
+  keepLocal: boolean;
+  cloudFolderId?: string;
   lastRun?: string;
   nextRun?: string;
 }
@@ -211,7 +213,7 @@ const Backups = () => {
   const [newSchedType, setNewSchedType] = useState<number>(1);
   const [newSchedTarget, setNewSchedTarget] = useState("");
   const [newSchedInterval, setNewSchedInterval] = useState(1440); // 24h
-  const [newSchedCloudSync, setNewSchedCloudSync] = useState(false);
+  const [newSchedStorage, setNewSchedStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newSchedCloudFolderId, setNewSchedCloudFolderId] = useState("");
 
   const parseFolderId = (value: string) => {
@@ -287,6 +289,19 @@ const Backups = () => {
     }
   };
 
+  const handleDisconnectDrive = async () => {
+    try {
+      if (confirm('¿Estás seguro de que quieres desconectar Google Drive? Esto detendrá los backups automáticos a la nube hasta que vuelvas a conectar.')) {
+        await backupService.revokeDriveAuth();
+        setDriveConnected(false);
+        showToast('Google Drive disconnected.', 'info');
+      }
+    } catch (error) {
+      console.error('Failed to disconnect Drive:', error);
+      showToast('Failed to disconnect Drive.', 'error');
+    }
+  };
+
   const handleRunBackup = async () => {
     try {
       showToast("Initializing PolancoVault...", "loading");
@@ -314,21 +329,30 @@ const Backups = () => {
 
   const handleCreateSchedule = async () => {
     try {
-      if (!newSchedName) return showToast("Name is required", "error");
+      if (!newSchedName) {
+        showToast("Enter a policy identifier", "error");
+        return;
+      }
+      
+      const syncToCloud = newSchedStorage !== 'local';
+      const keepLocal = newSchedStorage !== 'drive';
+
       await backupService.createSchedule({
         name: newSchedName,
         type: newSchedType,
         target: newSchedType === 0 ? newSchedTarget : null,
         intervalMinutes: newSchedInterval,
-        syncToCloud: newSchedCloudSync,
-        cloudFolderId: newSchedCloudFolderId || null,
+        format: 0,
         isActive: true,
-        format: 0
+        syncToCloud,
+        keepLocal,
+        cloudFolderId: syncToCloud ? newSchedCloudFolderId : undefined
       });
       setIsScheduleModalOpen(false);
+      showToast("Automation protocol established", "success");
       fetchData();
     } catch (error) {
-      alert('Failed to create schedule');
+      showToast("Protocol failure", "error");
     }
   };
 
@@ -464,7 +488,15 @@ const Backups = () => {
             </button>
           )}
           {driveConnected && (
-            <span className="text-[9px] font-black uppercase text-emerald-400/60 tracking-widest">✓ Authorized</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-black uppercase text-emerald-400/60 tracking-widest hidden sm:inline">✓ Authorized</span>
+              <button
+                onClick={handleDisconnectDrive}
+                className="bg-rose-500/10 text-rose-400 px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest border border-rose-500/20 hover:bg-rose-500/20 transition-all"
+              >
+                Disconnect
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -768,27 +800,42 @@ const Backups = () => {
             </div>
           )}
 
-          <div className="flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5">
-            <div className="flex items-center gap-4">
-              <Cloud size={20} className={newSchedCloudSync ? "text-brand-secondary" : "text-slate-700"} />
-              <span className="text-[10px] font-black uppercase text-white tracking-widest">Auto Cloud Sync</span>
+          <div className="space-y-4">
+            <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Vault Destination</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'local', label: 'Local', desc: 'Secure Server', icon: FolderSync },
+                { id: 'both', label: 'Both', desc: 'Server + Cloud', icon: Cloud },
+                { id: 'drive', label: 'Drive', desc: 'Cloud Only', icon: Download }
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setNewSchedStorage(opt.id as any)}
+                  className={`p-4 rounded-3xl border text-left transition-all ${
+                    newSchedStorage === opt.id 
+                      ? 'bg-brand-primary/10 border-brand-primary shadow-[0_0_20px_rgba(167,139,250,0.1)]' 
+                      : 'bg-white/5 border-white/5 hover:border-white/10'
+                  }`}
+                >
+                  <opt.icon size={16} className={newSchedStorage === opt.id ? 'text-brand-primary' : 'text-slate-500'} />
+                  <p className={`text-[9px] font-black uppercase mt-3 tracking-widest ${newSchedStorage === opt.id ? 'text-white' : 'text-slate-400'}`}>{opt.label}</p>
+                  <p className="text-[7px] font-bold text-slate-600 uppercase mt-1 leading-tight">{opt.desc}</p>
+                </button>
+              ))}
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" checked={newSchedCloudSync} onChange={() => setNewSchedCloudSync(!newSchedCloudSync)} />
-              <div className="w-12 h-6.5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-secondary shadow-[0_0_15px_#22d3ee33]"></div>
-            </label>
           </div>
 
-          {newSchedCloudSync && (
-            <div className="p-6 bg-brand-secondary/5 rounded-3xl border border-brand-secondary/10 space-y-4 animate-fade-in">
+          {newSchedStorage !== 'local' && (
+            <div className="p-6 bg-brand-primary/5 rounded-3xl border border-brand-primary/10 space-y-4 animate-fade-in">
                <div className="flex items-center gap-2 mb-2">
-                 <Cloud size={14} className="text-brand-secondary" />
-                 <span className="text-[10px] font-black uppercase text-brand-secondary tracking-widest">Target Folder Identity</span>
+                 <Cloud size={14} className="text-brand-primary" />
+                 <span className="text-[10px] font-black uppercase text-brand-primary tracking-widest">Cloud Relay Identity</span>
                </div>
                <input 
                 type="text" 
                 placeholder="Google Drive Parent ID" 
-                className="w-full bg-black/40 border border-brand-secondary/20 rounded-2xl px-5 py-3.5 text-xs text-brand-secondary placeholder:text-slate-700 outline-none focus:border-brand-secondary/50"
+                className="w-full bg-black/40 border border-brand-primary/20 rounded-2xl px-5 py-3.5 text-xs text-brand-primary placeholder:text-slate-700 outline-none focus:border-brand-primary/50"
                 value={newSchedCloudFolderId}
                 onChange={(e) => setNewSchedCloudFolderId(parseFolderId(e.target.value))}
               />
@@ -828,9 +875,19 @@ const Backups = () => {
                 </div>
               </div>
               <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                <div className="flex gap-3">
-                  <span className="text-[8px] text-slate-600 font-bold uppercase">Next Run: {s.nextRun ? format(new Date(s.nextRun), 'HH:mm | MMM dd') : 'N/A'}</span>
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg border ${
+                    !s.syncToCloud ? 'bg-slate-500/5 border-slate-500/10 text-slate-500' :
+                    s.keepLocal ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400' :
+                    'bg-brand-primary/5 border-brand-primary/10 text-brand-primary'
+                  }`}>
+                    {!s.syncToCloud ? <FolderSync size={10} /> : s.keepLocal ? <Cloud size={10} /> : <Download size={10} />}
+                  </div>
+                  <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">
+                    {!s.syncToCloud ? 'Local Only' : s.keepLocal ? 'Server + Cloud' : 'Cloud Only'}
+                  </span>
                 </div>
+                <span className="text-[8px] text-slate-600 font-bold uppercase">Next: {s.nextRun ? format(new Date(s.nextRun), 'HH:mm | MMM dd') : 'N/A'}</span>
                 <div className="flex gap-2">
                   {s.syncToCloud && <Cloud size={14} className="text-brand-secondary" />}
                   <button className="text-slate-600 hover:text-rose-400 transition-colors"><Trash2 size={14} /></button>
