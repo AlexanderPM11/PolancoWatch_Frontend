@@ -317,19 +317,29 @@ const Backups = () => {
       const keepLocal = newBackupStorage !== 'drive';
       const cloudFolderId = syncToCloud ? newBackupCloudFolderId : undefined;
 
-      if (newBackupType === 1) {
-        await backupService.triggerDatabaseBackup('Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
-      } else {
-        if (!newBackupTarget) {
-          showToast("Please select a target volume", "error");
-          return;
-        }
-        await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
+      if (newBackupType !== 1 && !newBackupTarget) {
+        showToast("Please select a target volume", "error");
+        return;
       }
+
       setIsBackupModalOpen(false);
-      setNewBackupName("");
-      showToast("Backup initiated successfully", "success");
-      fetchData();
+
+      const runAsync = async () => {
+        try {
+          if (newBackupType === 1) {
+            await backupService.triggerDatabaseBackup('Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
+          } else {
+            await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
+          }
+          setNewBackupName("");
+          showToast("Backup initiated successfully", "success");
+          fetchData();
+        } catch (error: any) {
+          showToast(error.response?.data || 'Backup failed to start', "error");
+        }
+      };
+      
+      runAsync();
     } catch (error: any) {
       showToast(error.response?.data || 'Backup failed to start', "error");
     }
