@@ -202,7 +202,8 @@ const Backups = () => {
   const [newBackupType, setNewBackupType] = useState<number>(1); // 1: DB, 0: Volume
   const [newBackupTarget, setNewBackupTarget] = useState("");
   const [newBackupName, setNewBackupName] = useState("");
-  const [newBackupCloudSync, setNewBackupCloudSync] = useState(false);
+  // storage: 'local' | 'both' | 'drive'
+  const [newBackupStorage, setNewBackupStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newBackupCloudFolderId, setNewBackupCloudFolderId] = useState("");
 
   // New Schedule Form
@@ -289,14 +290,18 @@ const Backups = () => {
   const handleRunBackup = async () => {
     try {
       showToast("Initializing PolancoVault...", "loading");
+      const syncToCloud = newBackupStorage !== 'local';
+      const keepLocal = newBackupStorage !== 'drive';
+      const cloudFolderId = syncToCloud ? newBackupCloudFolderId : undefined;
+
       if (newBackupType === 1) {
-        await backupService.triggerDatabaseBackup('Zip', newBackupCloudSync, newBackupCloudFolderId, newBackupName);
+        await backupService.triggerDatabaseBackup('Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
       } else {
         if (!newBackupTarget) {
           showToast("Please select a target volume", "error");
           return;
         }
-        await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', newBackupCloudSync, newBackupCloudFolderId, newBackupName);
+        await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
       }
       setIsBackupModalOpen(false);
       setNewBackupName("");
@@ -662,31 +667,45 @@ const Backups = () => {
           />
         </div>
 
-        <div className="p-7 bg-white/5 rounded-4xl space-y-5 border border-white/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Cloud size={20} className={newBackupCloudSync ? "text-brand-secondary animate-pulse" : "text-slate-600"} />
-              <div>
-                <p className="text-[10px] font-black uppercase text-white tracking-widest">Offsite Relay</p>
-                <p className="text-[9px] text-slate-500 uppercase font-black">Sync to Google Drive</p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" className="sr-only peer" checked={newBackupCloudSync} onChange={() => setNewBackupCloudSync(!newBackupCloudSync)} />
-              <div className="w-12 h-6.5 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-secondary shadow-[0_0_15px_rgba(34,211,238,0.2)]"></div>
-            </label>
+        <div className="p-5 bg-white/5 rounded-4xl border border-white/5 space-y-4">
+          <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Storage Destination</p>
+          <div className="grid grid-cols-3 gap-2">
+            {(['local', 'both', 'drive'] as const).map((opt) => {
+              const labels: Record<string, { icon: string, title: string, sub: string }> = {
+                local:  { icon: '🖥', title: 'Local Only',  sub: 'Server storage' },
+                both:   { icon: '⇅',  title: 'Server + Drive', sub: 'Keep both copies' },
+                drive:  { icon: '☁',  title: 'Drive Only',  sub: 'Delete after upload' },
+              };
+              const l = labels[opt];
+              const active = newBackupStorage === opt;
+              return (
+                <button
+                  key={opt}
+                  onClick={() => setNewBackupStorage(opt)}
+                  className={`p-4 rounded-2xl border text-center transition-all space-y-1 ${
+                    active
+                      ? opt === 'local' ? 'bg-slate-700/40 border-slate-500 text-white'
+                        : opt === 'both' ? 'bg-brand-primary/10 border-brand-primary text-brand-primary'
+                        : 'bg-brand-secondary/10 border-brand-secondary text-brand-secondary'
+                      : 'bg-white/3 border-white/5 text-slate-600 hover:border-white/10'
+                  }`}
+                >
+                  <p className="text-base">{l.icon}</p>
+                  <p className="text-[9px] font-black uppercase tracking-wider leading-tight">{l.title}</p>
+                  <p className="text-[8px] text-slate-600 uppercase font-bold">{l.sub}</p>
+                </button>
+              );
+            })}
           </div>
-          
-          {newBackupCloudSync && (
-            <div className="space-y-3 animate-fade-in">
-               <input 
-                type="text" 
-                placeholder="Target Parent ID" 
-                className="w-full bg-black/40 border border-brand-secondary/20 rounded-2xl px-5 py-3.5 text-xs text-brand-secondary placeholder:text-slate-700 outline-none focus:border-brand-secondary/50"
+          {newBackupStorage !== 'local' && (
+            <div className="space-y-2 animate-fade-in">
+              <input
+                type="text"
+                placeholder="Target Folder ID (uses default if empty)"
+                className="w-full bg-black/40 border border-brand-secondary/20 rounded-2xl px-5 py-3 text-xs text-brand-secondary placeholder:text-slate-700 outline-none focus:border-brand-secondary/50"
                 value={newBackupCloudFolderId}
                 onChange={(e) => setNewBackupCloudFolderId(parseFolderId(e.target.value))}
               />
-              <p className="text-[8px] text-slate-600 font-bold uppercase italic tracking-tighter">Using system default if empty</p>
             </div>
           )}
         </div>
