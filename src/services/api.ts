@@ -144,6 +144,8 @@ export interface BackupService {
   downloadBackup: (id: string, fileName: string) => Promise<void>;
   getAllowedPaths?: () => Promise<string[]>; // Deprecated
   getAvailableVolumes: () => Promise<{ name: string, path: string }[]>;
+  getDriveStatus: () => Promise<{ isAuthenticated: boolean }>;
+  getDriveAuthUrl: () => Promise<{ url: string }>;
 }
 
 export const backupService: BackupService = {
@@ -168,6 +170,8 @@ export const backupService: BackupService = {
       window.URL.revokeObjectURL(url);
     }),
   getAvailableVolumes: () => api.get<{ name: string, path: string }[]>('/api/backups/config/volumes').then(res => res.data),
+  getDriveStatus: () => api.get<{ isAuthenticated: boolean }>('/api/backups/drive/status').then(res => res.data),
+  getDriveAuthUrl: () => api.get<{ url: string }>('/api/backups/drive/auth-url').then(res => res.data),
 };
 
 export default api;

@@ -183,6 +183,8 @@ const Backups = () => {
   const [availableVolumes, setAvailableVolumes] = useState<{ name: string, path: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<Record<string, BackupProgress>>({});
+  const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
+  const [connectingDrive, setConnectingDrive] = useState(false);
   
   // Modals state
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
@@ -244,18 +246,43 @@ const Backups = () => {
 
   const fetchData = async () => {
     try {
-      const [backupsData, schedulesData, volumesData] = await Promise.all([
+      const [backupsData, schedulesData, volumesData, driveStatus] = await Promise.all([
         backupService.getBackups(),
         backupService.getSchedules(),
-        backupService.getAvailableVolumes()
+        backupService.getAvailableVolumes(),
+        backupService.getDriveStatus().catch(() => ({ isAuthenticated: false }))
       ]);
       setBackups(backupsData);
       setSchedules(schedulesData);
       setAvailableVolumes(volumesData);
+      setDriveConnected(driveStatus.isAuthenticated);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectDrive = async () => {
+    try {
+      setConnectingDrive(true);
+      const { url } = await backupService.getDriveAuthUrl();
+      window.open(url, '_blank', 'width=600,height=700');
+      // Poll for connection after user authorizes
+      const poll = setInterval(async () => {
+        const status = await backupService.getDriveStatus().catch(() => ({ isAuthenticated: false }));
+        if (status.isAuthenticated) {
+          setDriveConnected(true);
+          setConnectingDrive(false);
+          clearInterval(poll);
+          showToast('Google Drive connected successfully!', 'success');
+        }
+      }, 3000);
+      // Stop polling after 3 minutes
+      setTimeout(() => { clearInterval(poll); setConnectingDrive(false); }, 180000);
+    } catch (error: any) {
+      showToast(error.response?.data || 'Failed to get authorization URL', 'error');
+      setConnectingDrive(false);
     }
   };
 
@@ -395,6 +422,48 @@ const Backups = () => {
           </div>
         ))}
       </div>
+      {/* Google Drive Connection Panel */}
+      <section className="animate-fade-in">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
+          <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 italic">Cloud Relay Status</h2>
+        </div>
+        <div className={`p-6 rounded-3xl border flex items-center justify-between gap-4 ${
+          driveConnected 
+            ? 'bg-emerald-500/5 border-emerald-500/20' 
+            : 'bg-white/5 border-white/5'
+        }`}>
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-2xl ${
+              driveConnected ? 'bg-emerald-500/10' : 'bg-white/5'
+            }`}>
+              <Cloud size={22} className={driveConnected ? 'text-emerald-400' : 'text-slate-500'} />
+            </div>
+            <div>
+              <p className="text-xs font-black text-white uppercase tracking-widest">Google Drive</p>
+              <p className={`text-[10px] font-black uppercase tracking-widest mt-1 ${
+                driveConnected === null ? 'text-slate-600' : driveConnected ? 'text-emerald-400' : 'text-rose-400'
+              }`}>
+                {driveConnected === null ? 'Checking...' : driveConnected ? '● Connected — Backups will sync to Drive' : '○ Not Connected — Click to authorize'}
+              </p>
+            </div>
+          </div>
+          {!driveConnected && (
+            <button
+              onClick={handleConnectDrive}
+              disabled={connectingDrive}
+              className="bg-brand-primary text-obsidian-950 px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-brand-secondary transition-all shadow-lg shadow-brand-primary/20 flex items-center gap-2 disabled:opacity-50"
+            >
+              {connectingDrive ? <Loader2 size={14} className="animate-spin" /> : <Cloud size={14} />}
+              {connectingDrive ? 'Waiting...' : 'Connect Drive'}
+            </button>
+          )}
+          {driveConnected && (
+            <span className="text-[9px] font-black uppercase text-emerald-400/60 tracking-widest">✓ Authorized</span>
+          )}
+        </div>
+      </section>
+
 
       {/* Active Progress */}
       {Object.keys(progress).length > 0 && (
@@ -408,7 +477,7 @@ const Backups = () => {
               <div key={id} className="bg-brand-primary/5 border border-brand-primary/10 p-5 rounded-3xl relative overflow-hidden group">
                 <div className="absolute top-0 left-0 w-full h-1 bg-white/5">
                   <div 
-                    className="h-full bg-brand-primary transition-all duration-1000 shadow-[0_0_15px_#a78bfa]" 
+                    className={`h-full transition-all duration-1000 shadow-[0_0_15px_#a78bfa] ${p.message.toLowerCase().includes('failed') || p.message.toLowerCase().includes('error') ? 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)]' : 'bg-brand-primary'}`} 
                     style={{ width: `${p.percentage}%` }}
                   ></div>
                 </div>
@@ -419,7 +488,7 @@ const Backups = () => {
                     ) : (
                       <Loader2 size={16} className="animate-spin" />
                     )}
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${p.percentage === 100 ? 'text-emerald-400' : ''}`}>
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${p.percentage === 100 ? 'text-emerald-400' : p.message.toLowerCase().includes('failed') || p.message.toLowerCase().includes('error') ? 'text-rose-400' : ''}`}>
                       {p.message}
                     </span>
                   </div>
@@ -466,6 +535,11 @@ const Backups = () => {
                     <td className="px-8 py-5">
                       <div className="flex flex-col">
                         <span className="text-xs font-black text-white tracking-tight uppercase">{backup.name}</span>
+                        {backup.status === 3 && backup.errorMessage && (
+                          <span className="text-[9px] text-rose-400/80 font-bold uppercase mt-1 flex items-center gap-1">
+                            <AlertCircle size={10} /> {backup.errorMessage}
+                          </span>
+                        )}
                         <span className="text-[10px] text-slate-500 font-bold truncate max-w-[200px] mt-1">{backup.filePath}</span>
                       </div>
                     </td>
@@ -484,8 +558,15 @@ const Backups = () => {
                           <Cloud size={16} />
                         </a>
                       ) : backup.cloudSyncStatus === 2 ? (
-                        <div className="inline-flex p-2 bg-rose-500/10 text-rose-400 rounded-xl" title={backup.errorMessage}>
-                          <XCircle size={16} />
+                        <div className="flex flex-col items-center gap-1 group/error">
+                          <div className="inline-flex p-2 bg-rose-500/10 text-rose-400 rounded-xl cursor-help">
+                            <XCircle size={16} />
+                          </div>
+                          {backup.errorMessage && (
+                            <span className="text-[8px] text-rose-400/80 font-black uppercase tracking-tighter max-w-[80px] text-center leading-[1.1]">
+                              {backup.errorMessage}
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-800 font-black">⎯</span>
