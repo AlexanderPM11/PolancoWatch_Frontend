@@ -211,6 +211,12 @@ const Backups = () => {
   const [newSchedCloudSync, setNewSchedCloudSync] = useState(false);
   const [newSchedCloudFolderId, setNewSchedCloudFolderId] = useState("");
 
+  const parseFolderId = (value: string) => {
+    // Check for Google Drive URL pattern
+    const match = value.match(/folders\/([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : value.trim();
+  };
+
   useEffect(() => {
     fetchData();
     
@@ -257,13 +263,13 @@ const Backups = () => {
     try {
       showToast("Initializing PolancoVault...", "loading");
       if (newBackupType === 1) {
-        await backupService.triggerDatabaseBackup('Zip', newBackupCloudSync, newBackupName);
+        await backupService.triggerDatabaseBackup('Zip', newBackupCloudSync, newBackupCloudFolderId, newBackupName);
       } else {
         if (!newBackupTarget) {
           showToast("Please select a target volume", "error");
           return;
         }
-        await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', newBackupCloudSync, newBackupName);
+        await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', newBackupCloudSync, newBackupCloudFolderId, newBackupName);
       }
       setIsBackupModalOpen(false);
       setNewBackupName("");
@@ -276,13 +282,14 @@ const Backups = () => {
 
   const handleCreateSchedule = async () => {
     try {
-      if (!newSchedName) return alert("Name is required");
+      if (!newSchedName) return showToast("Name is required", "error");
       await backupService.createSchedule({
         name: newSchedName,
         type: newSchedType,
         target: newSchedType === 0 ? newSchedTarget : null,
         intervalMinutes: newSchedInterval,
         syncToCloud: newSchedCloudSync,
+        cloudFolderId: newSchedCloudFolderId || null,
         isActive: true,
         format: 0
       });
@@ -596,7 +603,7 @@ const Backups = () => {
                 placeholder="Target Parent ID" 
                 className="w-full bg-black/40 border border-brand-secondary/20 rounded-2xl px-5 py-3.5 text-xs text-brand-secondary placeholder:text-slate-700 outline-none focus:border-brand-secondary/50"
                 value={newBackupCloudFolderId}
-                onChange={(e) => setNewBackupCloudFolderId(e.target.value)}
+                onChange={(e) => setNewBackupCloudFolderId(parseFolderId(e.target.value))}
               />
               <p className="text-[8px] text-slate-600 font-bold uppercase italic tracking-tighter">Using system default if empty</p>
             </div>
@@ -671,6 +678,23 @@ const Backups = () => {
               <div className="w-12 h-6.5 bg-white/10 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-secondary shadow-[0_0_15px_#22d3ee33]"></div>
             </label>
           </div>
+
+          {newSchedCloudSync && (
+            <div className="p-6 bg-brand-secondary/5 rounded-3xl border border-brand-secondary/10 space-y-4 animate-fade-in">
+               <div className="flex items-center gap-2 mb-2">
+                 <Cloud size={14} className="text-brand-secondary" />
+                 <span className="text-[10px] font-black uppercase text-brand-secondary tracking-widest">Target Folder Identity</span>
+               </div>
+               <input 
+                type="text" 
+                placeholder="Google Drive Parent ID" 
+                className="w-full bg-black/40 border border-brand-secondary/20 rounded-2xl px-5 py-3.5 text-xs text-brand-secondary placeholder:text-slate-700 outline-none focus:border-brand-secondary/50"
+                value={newSchedCloudFolderId}
+                onChange={(e) => setNewSchedCloudFolderId(parseFolderId(e.target.value))}
+              />
+              <p className="text-[8px] text-slate-600 font-bold uppercase italic tracking-tighter">System default will be utilized if empty</p>
+            </div>
+          )}
         </div>
       </VaultOverlay>
 
