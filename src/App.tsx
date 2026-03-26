@@ -10,6 +10,7 @@ import ResetPassword from './pages/ResetPassword';
 
 import Profile from './pages/Profile';
 import WebMonitors from './pages/WebMonitors';
+import Backups from './pages/Backups';
 import Sidebar from './components/Sidebar';
 import { authService } from './services/api';
 
@@ -76,6 +77,16 @@ function App() {
             <PrivateRoute>
               <Layout>
                 <Documentation />
+              </Layout>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/backups" 
+          element={
+            <PrivateRoute>
+              <Layout>
+                <Backups />
               </Layout>
             </PrivateRoute>
           } 

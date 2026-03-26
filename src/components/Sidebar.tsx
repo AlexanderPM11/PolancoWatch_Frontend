@@ -8,6 +8,7 @@ import {
     ChevronLeft, 
     ChevronRight,
     ShieldCheck,
+    Database,
     User,
     Menu,
     X
@@ -65,6 +66,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
     const menuItems = [
         { icon: <LayoutDashboard size={20} />, label: 'Console', path: '/' },
         { icon: <Activity size={20} />, label: 'Alerts', path: '/alerts' },
+        { icon: <Database size={20} />, label: 'Backups', path: '/backups' },
         { icon: <ShieldCheck size={20} />, label: 'Web Monitors', path: '/web-monitors' },
         { icon: <Cpu size={20} />, label: 'Processes', path: '/processes' },
         { icon: <User size={20} />, label: 'Profile', path: '/profile' },

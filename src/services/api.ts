@@ -133,4 +133,41 @@ export const webMonitorService = {
   toggleMonitor: (id: number) => api.post<{ isActive: boolean }>(`/api/webmonitors/${id}/toggle`).then(res => res.data),
 };
 
+export interface BackupService {
+  getBackups: () => Promise<any[]>;
+  triggerDatabaseBackup: (format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string) => Promise<any>;
+  triggerVolumeBackup: (target: string, format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string) => Promise<any>;
+  getSchedules: () => Promise<any[]>;
+  createSchedule: (schedule: any) => Promise<any>;
+  deleteSchedule: (id: string) => Promise<any>;
+  deleteBackup: (id: string) => Promise<any>;
+  downloadBackup: (id: string, fileName: string) => Promise<void>;
+  getAllowedPaths?: () => Promise<string[]>; // Deprecated
+  getAvailableVolumes: () => Promise<{ name: string, path: string }[]>;
+}
+
+export const backupService: BackupService = {
+  getBackups: () => api.get('/api/backups').then(res => res.data),
+  triggerDatabaseBackup: (format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string) => 
+    api.post(`/api/backups/database?format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}`).then(res => res.data),
+  triggerVolumeBackup: (target: string, format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string) => 
+    api.post(`/api/backups/volume?target=${target}&format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}`).then(res => res.data),
+  getSchedules: () => api.get('/api/backups/schedules').then(res => res.data),
+  createSchedule: (schedule: any) => api.post('/api/backups/schedules', schedule).then(res => res.data),
+  deleteSchedule: (id: string) => api.delete(`/api/backups/schedules/${id}`),
+  deleteBackup: (id: string) => api.delete(`/api/backups/${id}`),
+  downloadBackup: (id: string, fileName: string) => 
+    api.get(`/api/backups/${id}/download`, { responseType: 'blob' }).then(res => {
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }),
+  getAvailableVolumes: () => api.get<{ name: string, path: string }[]>('/api/backups/config/volumes').then(res => res.data),
+};
+
 export default api;
