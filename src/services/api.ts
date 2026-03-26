@@ -133,13 +133,31 @@ export const webMonitorService = {
   toggleMonitor: (id: number) => api.post<{ isActive: boolean }>(`/api/webmonitors/${id}/toggle`).then(res => res.data),
 };
 
+export interface BackupSchedule {
+  id: string;
+  name: string;
+  type: number;
+  target?: string;
+  format: number;
+  intervalMinutes: number;
+  isActive: boolean;
+  syncToCloud: boolean;
+  keepLocal: boolean;
+  useCron: boolean;
+  cronExpression?: string;
+  cloudFolderId?: string;
+  lastRun?: string;
+  nextRun?: string;
+}
+
 export interface BackupService {
   getBackups: () => Promise<any[]>;
   triggerDatabaseBackup: (format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
   triggerVolumeBackup: (target: string, format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
-  getSchedules: () => Promise<any[]>;
-  createSchedule: (schedule: any) => Promise<any>;
-  deleteSchedule: (id: string) => Promise<any>;
+  getSchedules: () => Promise<BackupSchedule[]>;
+  createSchedule: (schedule: Partial<BackupSchedule>) => Promise<BackupSchedule>;
+  updateSchedule: (id: string, schedule: Partial<BackupSchedule>) => Promise<void>;
+  deleteSchedule: (id: string) => Promise<void>;
   deleteBackup: (id: string) => Promise<any>;
   downloadBackup: (id: string, fileName: string) => Promise<void>;
   getAllowedPaths?: () => Promise<string[]>; // Deprecated
@@ -155,9 +173,10 @@ export const backupService: BackupService = {
     api.post(`/api/backups/database?format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
   triggerVolumeBackup: (target: string, format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true) => 
     api.post(`/api/backups/volume?target=${target}&format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
-  getSchedules: () => api.get('/api/backups/schedules').then(res => res.data),
-  createSchedule: (schedule: any) => api.post('/api/backups/schedules', schedule).then(res => res.data),
-  deleteSchedule: (id: string) => api.delete(`/api/backups/schedules/${id}`),
+  getSchedules: () => api.get<BackupSchedule[]>('/api/backups/schedules').then(res => res.data),
+  createSchedule: (schedule) => api.post<BackupSchedule>('/api/backups/schedules', schedule).then(res => res.data),
+  updateSchedule: (id, schedule) => api.put(`/api/backups/schedules/${id}`, schedule).then(res => res.data),
+  deleteSchedule: (id) => api.delete(`/api/backups/schedules/${id}`).then(res => res.data),
   deleteBackup: (id: string) => api.delete(`/api/backups/${id}`),
   downloadBackup: (id: string, fileName: string) => 
     api.get(`/api/backups/${id}/download`, { responseType: 'blob' }).then(res => {

@@ -18,10 +18,11 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
-import { backupService } from '../services/api';
+import { backupService, type BackupSchedule } from '../services/api';
 import { backupSignalRService } from '../services/backupSignalR';
 import { format } from 'date-fns';
 import Toast, { type ToastType } from '../components/Toast';
+import Modal from '../components/Modal';
 
 interface Backup {
   id: string;
@@ -37,20 +38,6 @@ interface Backup {
   cloudLink?: string;
 }
 
-interface BackupSchedule {
-  id: string;
-  name: string;
-  type: number;
-  target?: string;
-  format: number;
-  intervalMinutes: number;
-  isActive: boolean;
-  syncToCloud: boolean;
-  keepLocal: boolean;
-  cloudFolderId?: string;
-  lastRun?: string;
-  nextRun?: string;
-}
 
 interface BackupProgress {
   backupId: string;
@@ -158,8 +145,8 @@ const VaultOverlay = ({ isOpen, onClose, title, children, footer }: {
   return (
     <div className="fixed inset-0 z-150 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-obsidian-950/80 backdrop-blur-xl animate-fade-in" onClick={onClose}></div>
-      <div className="relative w-full max-w-lg glass-panel rounded-[2.5rem] border border-white/10 p-8 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-float-up">
-        <div className="flex items-center justify-between mb-8">
+      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col glass-panel rounded-[2.5rem] border border-white/10 p-8 shadow-[0_0_100px_rgba(0,0,0,0.5)] animate-float-up">
+        <div className="flex items-center justify-between mb-6 shrink-0">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-brand-primary/10 rounded-2xl border border-brand-primary/20 text-brand-primary">
               <Settings size={20} />
@@ -170,10 +157,16 @@ const VaultOverlay = ({ isOpen, onClose, title, children, footer }: {
             <X size={20} />
           </button>
         </div>
-        <div className="space-y-6">
+        
+        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6 pb-2">
           {children}
         </div>
-        {footer && <div className="mt-8 pt-6 border-t border-white/5 flex justify-end gap-3">{footer}</div>}
+        
+        {footer && (
+          <div className="mt-6 pt-6 border-t border-white/5 flex justify-end gap-3 shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -204,9 +197,13 @@ const Backups = () => {
   const [newBackupType, setNewBackupType] = useState<number>(1); // 1: DB, 0: Volume
   const [newBackupTarget, setNewBackupTarget] = useState("");
   const [newBackupName, setNewBackupName] = useState("");
-  // storage: 'local' | 'both' | 'drive'
+  //storage: 'local' | 'both' | 'drive'
   const [newBackupStorage, setNewBackupStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newBackupCloudFolderId, setNewBackupCloudFolderId] = useState("");
+
+  const [showScheduleDeleteConfirm, setShowScheduleDeleteConfirm] = useState(false);
+  const [schedToDelete, setSchedToDelete] = useState<string | null>(null);
+  const [showDriveDisconnectConfirm, setShowDriveDisconnectConfirm] = useState(false);
 
   // New Schedule Form
   const [newSchedName, setNewSchedName] = useState("");
@@ -215,6 +212,14 @@ const Backups = () => {
   const [newSchedInterval, setNewSchedInterval] = useState(1440); // 24h
   const [newSchedStorage, setNewSchedStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newSchedCloudFolderId, setNewSchedCloudFolderId] = useState("");
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  
+  // Advanced Scheduling State
+  const [schedStrategy, setSchedStrategy] = useState<'interval' | 'calendar'>('interval');
+  const [calendarFreq, setCalendarFreq] = useState<'daily'|'weekly'>('daily');
+  const [selectedDays, setSelectedDays] = useState<number[]>([]); // 1-7 (Mon-Sun)
+  const [scheduledTime, setScheduledTime] = useState("03:00");
 
   const parseFolderId = (value: string) => {
     // Check for Google Drive URL pattern
@@ -291,15 +296,18 @@ const Backups = () => {
 
   const handleDisconnectDrive = async () => {
     try {
-      if (confirm('¿Estás seguro de que quieres desconectar Google Drive? Esto detendrá los backups automáticos a la nube hasta que vuelvas a conectar.')) {
-        await backupService.revokeDriveAuth();
-        setDriveConnected(false);
-        showToast('Google Drive disconnected.', 'info');
-      }
+      await backupService.revokeDriveAuth();
+      setShowDriveDisconnectConfirm(false);
+      setDriveConnected(false);
+      showToast("Cloud connection severed", "success");
     } catch (error) {
       console.error('Failed to disconnect Drive:', error);
       showToast('Failed to disconnect Drive.', 'error');
     }
+  };
+
+  const confirmDisconnectDrive = () => {
+    setShowDriveDisconnectConfirm(true);
   };
 
   const handleRunBackup = async () => {
@@ -336,24 +344,89 @@ const Backups = () => {
       
       const syncToCloud = newSchedStorage !== 'local';
       const keepLocal = newSchedStorage !== 'drive';
+      
+      let cronExpression: string | undefined = undefined;
+      if (schedStrategy === 'calendar') {
+        const [hours, minutes] = scheduledTime.split(':');
+        const days = calendarFreq === 'daily' ? '*' : selectedDays.join(',');
+        cronExpression = `${minutes} ${hours} * * ${days || '*'}`;
+      }
 
-      await backupService.createSchedule({
+      const scheduleData: Partial<BackupSchedule> = {
         name: newSchedName,
         type: newSchedType,
-        target: newSchedType === 0 ? newSchedTarget : null,
-        intervalMinutes: newSchedInterval,
+        target: newSchedType === 0 ? newSchedTarget : undefined,
+        intervalMinutes: schedStrategy === 'interval' ? newSchedInterval : 0,
         format: 0,
         isActive: true,
+        useCron: schedStrategy === 'calendar',
+        cronExpression,
         syncToCloud,
         keepLocal,
         cloudFolderId: syncToCloud ? newSchedCloudFolderId : undefined
-      });
+      };
+
+      if (isEditingSchedule && editingScheduleId) {
+        await backupService.updateSchedule(editingScheduleId, { ...scheduleData, id: editingScheduleId });
+        showToast("Automation protocol updated", "success");
+      } else {
+        await backupService.createSchedule(scheduleData);
+        showToast("Automation protocol established", "success");
+      }
+
       setIsScheduleModalOpen(false);
-      showToast("Automation protocol established", "success");
       fetchData();
     } catch (error) {
       showToast("Protocol failure", "error");
     }
+  };
+
+  const handleEditSchedule = (s: BackupSchedule) => {
+    setNewSchedName(s.name);
+    setNewSchedType(s.type);
+    setNewSchedTarget(s.target || "");
+    setNewSchedInterval(s.intervalMinutes);
+    setNewSchedStorage(!s.syncToCloud ? 'local' : s.keepLocal ? 'both' : 'drive');
+    setNewSchedCloudFolderId(s.cloudFolderId || "");
+    
+    // Recovery of scheduling state
+    if (s.useCron && s.cronExpression) {
+       setSchedStrategy('calendar');
+       const parts = s.cronExpression.split(' ');
+       // Format: "m h * * d"
+       setScheduledTime(`${parts[1].padStart(2, '0')}:${parts[0].padStart(2, '0')}`);
+       if (parts[4] === '*') {
+          setCalendarFreq('daily');
+          setSelectedDays([]);
+       } else {
+          setCalendarFreq('weekly');
+          setSelectedDays(parts[4].split(',').map(Number));
+       }
+    } else {
+       setSchedStrategy('interval');
+    }
+
+    setIsEditingSchedule(true);
+    setEditingScheduleId(s.id);
+    setIsScheduleModalOpen(true);
+  };
+
+  const handleDeleteSchedule = async () => {
+    if (!schedToDelete) return;
+    try {
+      await backupService.deleteSchedule(schedToDelete);
+      setShowScheduleDeleteConfirm(false);
+      setSchedToDelete(null);
+      showToast("Automation protocol terminated", "success");
+      fetchData();
+    } catch (err) {
+      showToast("Deletion failed", "error");
+    }
+  };
+
+  const confirmDeleteSchedule = (id: string) => {
+    setSchedToDelete(id);
+    setShowScheduleDeleteConfirm(true);
   };
 
   const handleDelete = (id: string) => {
@@ -491,7 +564,7 @@ const Backups = () => {
             <div className="flex items-center gap-3">
               <span className="text-[9px] font-black uppercase text-emerald-400/60 tracking-widest hidden sm:inline">✓ Authorized</span>
               <button
-                onClick={handleDisconnectDrive}
+                onClick={confirmDisconnectDrive}
                 className="bg-rose-500/10 text-rose-400 px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest border border-rose-500/20 hover:bg-rose-500/20 transition-all"
               >
                 Disconnect
@@ -745,48 +818,146 @@ const Backups = () => {
 
       <VaultOverlay
         isOpen={isScheduleModalOpen}
-        onClose={() => setIsScheduleModalOpen(false)}
-        title="Automation Protocol"
+        onClose={() => {
+          setIsScheduleModalOpen(false);
+          setIsEditingSchedule(false);
+          setEditingScheduleId(null);
+          setNewSchedName("");
+          setNewSchedTarget("");
+          setNewSchedInterval(1440);
+          setNewSchedStorage('local');
+          setNewSchedCloudFolderId("");
+          setSchedStrategy('interval');
+          setCalendarFreq('daily');
+          setSelectedDays([]);
+          setScheduledTime("03:00");
+        }}
+        title={isEditingSchedule ? "Modify Automation Protocol" : "New Automation Protocol"}
         footer={
-          <>
-             <button onClick={() => setIsScheduleModalOpen(false)} className="px-6 py-2.5 text-[10px] font-black uppercase text-slate-500 hover:text-white transition-colors">Abort</button>
-             <button onClick={handleCreateSchedule} className="bg-emerald-500 text-obsidian-950 px-8 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.2)]">Commit Task</button>
-          </>
+          <button 
+            onClick={handleCreateSchedule}
+            className="w-full bg-brand-primary text-obsidian-950 px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-brand-primary/20 hover:scale-[1.02] transition-all"
+          >
+            {isEditingSchedule ? "Apply Changes" : "Confirm Protocol"}
+          </button>
         }
       >
         <div className="space-y-6">
-          <div className="space-y-3 px-1">
-            <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Protocol Alias</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Daily Vault Sync" 
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white outline-none focus:border-brand-primary/50"
-              value={newSchedName}
-              onChange={(e) => setNewSchedName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-            />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-3 px-1">
-              <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Asset Class</label>
-              <select 
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xs text-white outline-none appearance-none"
-                value={newSchedType}
-                onChange={(e) => setNewSchedType(Number(e.target.value))}
-              >
-                <option value={1} className="bg-obsidian-900 text-white">Database Instance</option>
-                <option value={0} className="bg-obsidian-900 text-white">Docker Volume</option>
-              </select>
-            </div>
-            <div className="space-y-3 px-1">
-              <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Recurrence (Minutes)</label>
+            <div className="space-y-2">
+              <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Protocol Alias</label>
               <input 
-                type="number" 
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-xs text-white outline-none"
-                value={newSchedInterval}
-                onChange={(e) => setNewSchedInterval(Number(e.target.value))}
+                type="text" 
+                placeholder="Name" 
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-sm text-white outline-none focus:border-brand-primary/50"
+                value={newSchedName}
+                onChange={(e) => setNewSchedName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Asset Class</label>
+              <div className="grid grid-cols-2 gap-1 p-1 bg-black/20 rounded-2xl border border-white/5">
+                {[
+                  { id: 1, label: 'DB' },
+                  { id: 0, label: 'VOL' }
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setNewSchedType(t.id)}
+                    className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                      newSchedType === t.id ? 'bg-white/10 text-white shadow-lg' : 'text-slate-500 hover:text-white'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Scheduling Strategy</label>
+            <div className="flex gap-2 p-1 bg-black/20 rounded-2xl border border-white/5">
+              {(['interval', 'calendar'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSchedStrategy(s)}
+                  className={`flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                    schedStrategy === s ? 'bg-brand-primary text-obsidian-950 shadow-lg' : 'text-slate-500 hover:text-white'
+                  }`}
+                >
+                  {s === 'interval' ? 'Simple Interval' : 'Scheduled Calendar'}
+                </button>
+              ))}
+            </div>
+
+            {schedStrategy === 'interval' ? (
+              <div className="space-y-3 animate-fade-in">
+                <label className="text-[8px] font-black uppercase text-slate-600 tracking-widest ml-1">Repeat Every (Minutes)</label>
+                <div className="relative">
+                  <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input 
+                    type="number" 
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl pl-12 pr-5 py-4 text-xs text-white outline-none focus:border-brand-primary/50"
+                    value={newSchedInterval}
+                    onChange={(e) => setNewSchedInterval(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase text-slate-600 tracking-widest ml-1">Frequency</label>
+                    <select 
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white outline-none appearance-none"
+                      value={calendarFreq}
+                      onChange={(e) => setCalendarFreq(e.target.value as any)}
+                    >
+                      <option value="daily" className="bg-obsidian-900">Daily Execution</option>
+                      <option value="weekly" className="bg-obsidian-900">Weekly Cycle</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase text-slate-600 tracking-widest ml-1">Execution Time (24h)</label>
+                    <input 
+                      type="time" 
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-xs text-white outline-none focus:border-brand-primary/50"
+                      value={scheduledTime}
+                      onChange={(e) => setScheduledTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {calendarFreq === 'weekly' && (
+                  <div className="space-y-3">
+                    <label className="text-[8px] font-black uppercase text-slate-600 tracking-widest ml-1">Selection Days</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((day, idx) => {
+                        const active = selectedDays.includes(idx);
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              if (active) setSelectedDays(selectedDays.filter(d => d !== idx));
+                              else setSelectedDays([...selectedDays, idx]);
+                            }}
+                            className={`px-3 py-2 rounded-xl text-[9px] font-black border transition-all ${
+                              active ? 'bg-brand-primary/20 border-brand-primary text-brand-primary' : 'bg-white/5 border-white/5 text-slate-600'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {newSchedType === 0 && (
@@ -804,42 +975,40 @@ const Backups = () => {
             <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Vault Destination</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'local', label: 'Local', desc: 'Secure Server', icon: FolderSync },
-                { id: 'both', label: 'Both', desc: 'Server + Cloud', icon: Cloud },
-                { id: 'drive', label: 'Drive', desc: 'Cloud Only', icon: Download }
+                { id: 'local', label: 'Local', desc: 'Secure', icon: FolderSync },
+                { id: 'both', label: 'Both', desc: 'Dual', icon: Cloud },
+                { id: 'drive', label: 'Drive', desc: 'Cloud', icon: Download }
               ].map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setNewSchedStorage(opt.id as any)}
-                  className={`p-4 rounded-3xl border text-left transition-all ${
+                  className={`p-3 rounded-2xl border text-center transition-all ${
                     newSchedStorage === opt.id 
-                      ? 'bg-brand-primary/10 border-brand-primary shadow-[0_0_20px_rgba(167,139,250,0.1)]' 
-                      : 'bg-white/5 border-white/5 hover:border-white/10'
+                      ? 'bg-brand-primary/10 border-brand-primary text-brand-primary shadow-lg' 
+                      : 'bg-white/5 border-white/5 hover:border-white/10 text-slate-500'
                   }`}
                 >
-                  <opt.icon size={16} className={newSchedStorage === opt.id ? 'text-brand-primary' : 'text-slate-500'} />
-                  <p className={`text-[9px] font-black uppercase mt-3 tracking-widest ${newSchedStorage === opt.id ? 'text-white' : 'text-slate-400'}`}>{opt.label}</p>
-                  <p className="text-[7px] font-bold text-slate-600 uppercase mt-1 leading-tight">{opt.desc}</p>
+                  <opt.icon size={14} className="mx-auto" />
+                  <p className="text-[9px] font-black uppercase mt-2 tracking-widest">{opt.label}</p>
                 </button>
               ))}
             </div>
           </div>
 
           {newSchedStorage !== 'local' && (
-            <div className="p-6 bg-brand-primary/5 rounded-3xl border border-brand-primary/10 space-y-4 animate-fade-in">
-               <div className="flex items-center gap-2 mb-2">
+            <div className="p-5 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 space-y-3 animate-fade-in -mt-4">
+               <div className="flex items-center gap-2">
                  <Cloud size={14} className="text-brand-primary" />
-                 <span className="text-[10px] font-black uppercase text-brand-primary tracking-widest">Cloud Relay Identity</span>
+                 <span className="text-[9px] font-black uppercase text-brand-primary tracking-widest">Cloud Relay Identity</span>
                </div>
                <input 
                 type="text" 
                 placeholder="Google Drive Parent ID" 
-                className="w-full bg-black/40 border border-brand-primary/20 rounded-2xl px-5 py-3.5 text-xs text-brand-primary placeholder:text-slate-700 outline-none focus:border-brand-primary/50"
+                className="w-full bg-black/40 border border-brand-primary/10 rounded-xl px-4 py-2.5 text-[10px] text-brand-primary placeholder:text-slate-700 outline-none focus:border-brand-primary/50"
                 value={newSchedCloudFolderId}
                 onChange={(e) => setNewSchedCloudFolderId(parseFolderId(e.target.value))}
               />
-              <p className="text-[8px] text-slate-600 font-bold uppercase italic tracking-tighter">System default will be utilized if empty</p>
             </div>
           )}
         </div>
@@ -859,6 +1028,38 @@ const Backups = () => {
           <Clock className="w-4 h-4 text-emerald-400" />
           <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Automation Protocols</h2>
         </div>
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={showScheduleDeleteConfirm}
+          onClose={() => setShowScheduleDeleteConfirm(false)}
+          title="Terminal Purge"
+          type="danger"
+          footer={
+            <>
+              <button onClick={() => setShowScheduleDeleteConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Abort</button>
+              <button onClick={handleDeleteSchedule} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Purge Protocol</button>
+            </>
+          }
+        >
+          Are you sure you want to permanently decommission this automated backup protocol? Active timers will be halted and recurring task entries will be purged from the system registry.
+        </Modal>
+
+        {/* Drive Disconnect Modal */}
+        <Modal
+          isOpen={showDriveDisconnectConfirm}
+          onClose={() => setShowDriveDisconnectConfirm(false)}
+          title="Cloud Severance"
+          type="warning"
+          footer={
+            <>
+              <button onClick={() => setShowDriveDisconnectConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Cancel</button>
+              <button onClick={handleDisconnectDrive} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Disconnect Cloud</button>
+            </>
+          }
+        >
+          Disconnecting Google Drive will immediately halt all automated cloud synchronization pipelines. You will need to re-verify authentication credentials to restore cloud relay capabilities.
+        </Modal>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {schedules.map(s => (
             <div key={s.id} className="bg-white/5 border border-white/5 rounded-3xl p-6 flex flex-col justify-between group hover:border-emerald-500/20 transition-all">
@@ -866,7 +1067,14 @@ const Backups = () => {
                 <div>
                   <h3 className="text-sm font-black text-white uppercase">{s.name}</h3>
                   <p className="text-[9px] text-slate-500 uppercase font-black mt-1">
-                    Every {s.intervalMinutes} min | 
+                    {s.useCron ? (
+                      <span className="text-brand-primary">
+                        {s.cronExpression?.split(' ')[4] === '*' ? 'Daily' : 'Weekly'} 
+                        {' at ' + s.cronExpression?.split(' ')[1].padStart(2, '0') + ':' + s.cronExpression?.split(' ')[0].padStart(2, '0')}
+                      </span>
+                    ) : (
+                      `Every ${s.intervalMinutes} min`
+                    )} | 
                     <span className="text-emerald-400 ml-1">{s.type === 1 ? 'DATABASE' : 'VOLUME'}</span>
                   </p>
                 </div>
@@ -889,8 +1097,18 @@ const Backups = () => {
                 </div>
                 <span className="text-[8px] text-slate-600 font-bold uppercase">Next: {s.nextRun ? format(new Date(s.nextRun), 'HH:mm | MMM dd') : 'N/A'}</span>
                 <div className="flex gap-2">
-                  {s.syncToCloud && <Cloud size={14} className="text-brand-secondary" />}
-                  <button className="text-slate-600 hover:text-rose-400 transition-colors"><Trash2 size={14} /></button>
+                  <button 
+                    onClick={() => handleEditSchedule(s)}
+                    className="p-2 bg-white/5 border border-white/5 rounded-xl text-slate-500 hover:text-brand-primary hover:border-brand-primary/20 transition-all"
+                  >
+                    <Settings size={14} />
+                  </button>
+                  <button 
+                    onClick={() => confirmDeleteSchedule(s.id)}
+                    className="p-2 bg-white/5 border border-white/5 rounded-xl text-slate-500 hover:text-rose-400 hover:border-rose-500/20 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
             </div>

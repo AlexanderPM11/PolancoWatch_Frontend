@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { webMonitorService } from '../services/api';
 import type { WebMonitor, WebCheck } from '../services/api';
+import Modal from '../components/Modal';
 
 const formatInterval = (seconds: number): string => {
     if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400}d`;
@@ -35,9 +36,9 @@ const StatusBadge = ({ up }: { up: boolean }) => (
     </div>
 );
 
-const MonitorCard = ({ monitor, onDelete, onToggle, onEdit }: { 
+const MonitorCard = ({ monitor, confirmDelete, onToggle, onEdit }: { 
     monitor: WebMonitor, 
-    onDelete: (id: number) => void,
+    confirmDelete: (id: number) => void,
     onToggle: (id: number) => void,
     onEdit: (monitor: WebMonitor) => void 
 }) => {
@@ -134,7 +135,7 @@ const MonitorCard = ({ monitor, onDelete, onToggle, onEdit }: {
                         <Pencil size={18} />
                     </button>
                     <button 
-                        onClick={() => onDelete(monitor.id)}
+                        onClick={() => confirmDelete(monitor.id)}
                         className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
                         title="Delete Monitor"
                     >
@@ -202,7 +203,10 @@ export default function WebMonitors() {
         }
     };
 
-    const handleEdit = (monitor: WebMonitor) => {
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [monitorToDelete, setMonitorToDelete] = useState<number | null>(null);
+
+    const handleEditMonitor = (monitor: WebMonitor) => {
         setEditingMonitor(monitor);
         // Convert stored seconds back to a friendly unit
         let unit: 'seconds' | 'minutes' | 'hours' | 'days' = 'seconds';
@@ -226,17 +230,24 @@ export default function WebMonitors() {
         setIntervalUnit('minutes');
     };
 
-    const handleDelete = async (id: number) => {
-        if (!window.confirm("Are you sure you want to delete this monitor?")) return;
+    const confirmDelete = (id: number) => {
+        setMonitorToDelete(id);
+        setShowDeleteConfirm(true);
+    };
+
+    const handleDeleteMonitor = async () => {
+        if (monitorToDelete === null) return;
         try {
-            await webMonitorService.deleteMonitor(id);
+            await webMonitorService.deleteMonitor(monitorToDelete);
+            setShowDeleteConfirm(false);
+            setMonitorToDelete(null);
             fetchMonitors();
         } catch (err) {
             console.error(err);
         }
     };
 
-    const handleToggle = async (id: number) => {
+    const handleToggleMonitor = async (id: number) => {
         try {
             await webMonitorService.toggleMonitor(id);
             fetchMonitors();
@@ -253,6 +264,20 @@ export default function WebMonitors() {
     return (
         <div className="w-full">
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+            <Modal
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                title="Confirm Removal"
+                type="danger"
+                footer={
+                    <>
+                        <button onClick={() => setShowDeleteConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Cancel</button>
+                        <button onClick={handleDeleteMonitor} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Remove Monitor</button>
+                    </>
+                }
+            >
+                Are you sure you want to decommission this monitoring node? This action is irreversible and all historical latency data will be purged.
+            </Modal>
             <div className="max-w-7xl mx-auto space-y-12">
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -334,10 +359,10 @@ export default function WebMonitors() {
                         {filteredMonitors.map(monitor => (
                             <MonitorCard 
                                 key={monitor.id} 
-                                 monitor={monitor} 
-                                onDelete={handleDelete}
-                                onToggle={handleToggle}
-                                onEdit={handleEdit}
+                                monitor={monitor} 
+                                confirmDelete={confirmDelete}
+                                onToggle={handleToggleMonitor}
+                                onEdit={handleEditMonitor}
                             />
                         ))}
                     </div>
