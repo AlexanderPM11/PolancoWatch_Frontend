@@ -869,8 +869,9 @@ const Backups = () => {
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Protocol Alias</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Resource</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Storage</th>
-                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Frequency</th>
+                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Storage</th>
+                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Retention</th>
+                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Frequency</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Next Run</th>
                       <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Ops</th>
                     </tr>
@@ -910,13 +911,17 @@ const Backups = () => {
                                <span className="text-[9px] font-black text-slate-500 uppercase">
                                  {!s.syncToCloud ? 'LCL' : s.keepLocal ? 'S+C' : 'CLD'}
                                </span>
-                               {s.syncToCloud && (s.retentionCount ?? 0) > 0 && (
-                                 <span className="text-[8px] font-black bg-brand-primary/20 text-brand-primary px-1.5 py-0.5 rounded-md border border-brand-primary/30">
-                                   R:{s.retentionCount}
-                                 </span>
-                               )}
                             </div>
-                          </td>
+                           </td>
+                           <td className="px-8 py-5 text-center">
+                              {s.syncToCloud && (s.retentionCount ?? 0) > 0 ? (
+                                <span className="text-[10px] font-black bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-lg border border-brand-primary/20 uppercase tracking-tighter">
+                                  LIM: {s.retentionCount}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-black text-slate-700 uppercase">∞</span>
+                              )}
+                           </td>
                           <td className="px-8 py-5">
                              <span className="text-[10px] font-black text-slate-300 uppercase">
                                {s.useCron ? (
@@ -926,7 +931,7 @@ const Backups = () => {
                           </td>
                           <td className="px-8 py-5">
                              <span className="text-[10px] font-black text-slate-500 uppercase">
-                               {s.nextRun ? format(new Date(s.nextRun), 'HH:mm | MMM dd') : '—'}
+                               {s.nextRun ? format(new Date(s.nextRun), 'hh:mm aa | MMM dd') : '—'}
                              </span>
                           </td>
                           <td className="px-8 py-5 text-right">
