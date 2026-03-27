@@ -16,7 +16,8 @@ import {
   ChevronDown,
   Settings,
   AlertCircle,
-  X
+  X,
+  History as LucideHistory
 } from 'lucide-react';
 import { backupService, type BackupSchedule } from '../services/api';
 import { backupSignalRService } from '../services/backupSignalR';
@@ -95,7 +96,7 @@ const Combobox = ({
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-obsidian-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-obsidian-900 border border-white/10 rounded-2xl shadow-2xl z-200 overflow-hidden">
           <div className="p-2 border-b border-white/5">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -187,6 +188,40 @@ const VaultOverlay = ({ isOpen, onClose, title, children, footer }: {
   );
 };
 
+const Pagination = ({ currentPage, totalItems, itemsPerPage, onPageChange }: { 
+  currentPage: number, 
+  totalItems: number, 
+  itemsPerPage: number, 
+  onPageChange: (page: number) => void 
+}) => {
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  if (totalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-between px-8 py-4 border-t border-white/5 bg-white/2">
+      <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+        Showing <span className="text-white">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="text-white">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="text-white">{totalItems}</span> results
+      </p>
+      <div className="flex gap-2">
+        <button 
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="p-2 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest bg-white/5 text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 transition-all border border-white/5"
+        >
+          Previous
+        </button>
+        <button 
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="p-2 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest bg-brand-primary text-obsidian-950 hover:bg-brand-secondary disabled:opacity-30 transition-all shadow-lg shadow-brand-primary/20"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const Backups = () => {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [schedules, setSchedules] = useState<BackupSchedule[]>([]);
@@ -243,6 +278,12 @@ const Backups = () => {
   const [calendarFreq, setCalendarFreq] = useState<'daily'|'weekly'>('daily');
   const [selectedDays, setSelectedDays] = useState<number[]>([]); // 1-7 (Mon-Sun)
   const [scheduledTime, setScheduledTime] = useState("03:00");
+
+  // Tabs & Pagination State
+  const [activeTab, setActiveTab] = useState<'history' | 'schedules'>('history');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [schedulesPage, setSchedulesPage] = useState(1);
+  const itemsPerPage = 8;
 
   const parseFolderId = (value: string) => {
     // Check for Google Drive URL pattern
@@ -464,6 +505,17 @@ const Backups = () => {
     setIsScheduleModalOpen(true);
   };
 
+  const handleToggleScheduleAsync = async (s: BackupSchedule) => {
+    try {
+      const updated = { ...s, isActive: !s.isActive };
+      await backupService.updateSchedule(s.id, updated);
+      showToast(updated.isActive ? "Protocol activated" : "Protocol deactivated", "success");
+      fetchData();
+    } catch (err) {
+      showToast("Toggle failed", "error");
+    }
+  };
+
   const handleDeleteSchedule = async () => {
     if (!schedToDelete) return;
     try {
@@ -663,120 +715,250 @@ const Backups = () => {
         </section>
       )}
 
-      {/* History Table */}
+      {/* History & Protocols Tabs */}
       <section className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-slate-700"></div>
-            <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 italic">Inventory History</h2>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex p-1.5 bg-obsidian-900 border border-white/10 rounded-3xl w-fit shadow-2xl">
+            <button 
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center gap-3 px-6 py-3 rounded-[1.1rem] transition-all ${
+                activeTab === 'history' 
+                  ? 'bg-brand-primary text-obsidian-950 font-black shadow-xl shadow-brand-primary/20' 
+                  : 'text-slate-500 font-bold hover:text-white'
+              }`}
+            >
+              <LucideHistory size={16} />
+              <span className="text-[10px] uppercase tracking-[0.2em]">Recent History</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('schedules')}
+              className={`flex items-center gap-3 px-6 py-3 rounded-[1.1rem] transition-all ${
+                activeTab === 'schedules' 
+                  ? 'bg-brand-primary text-obsidian-950 font-black shadow-xl shadow-brand-primary/20' 
+                  : 'text-slate-500 font-bold hover:text-white'
+              }`}
+            >
+              <Clock size={16} />
+              <span className="text-[10px] uppercase tracking-[0.2em]">Automation Protocols</span>
+            </button>
           </div>
-          <Settings className="w-4 h-4 text-slate-700 cursor-pointer hover:text-slate-400 transition-colors" />
+
+          <div className="flex items-center gap-4">
+             <div className="h-px w-20 bg-linear-to-r from-transparent to-white/10 hidden md:block"></div>
+             <Settings className="w-4 h-4 text-slate-700 cursor-pointer hover:text-slate-400 transition-colors" />
+          </div>
         </div>
 
-        <div className="bg-obsidian-900/50 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-3xl shadow-2xl">
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/5 bg-white/2">
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Resource</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Type</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Cloud</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Metric</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Timestamp</th>
-                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Ops</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {backups.map((backup) => (
-                  <tr key={backup.id} className="hover:bg-white/2 transition-colors group">
-                    <td className="px-8 py-5">
-                      <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/5">
-                        {getStatusIcon(backup.status)}
-                      </div>
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-black text-white tracking-tight uppercase">{backup.name}</span>
-                        {backup.status === 1 && (
-                          <span className="text-[9px] text-brand-primary/80 font-bold uppercase mt-1 flex items-center gap-1">
-                            <Loader2 size={10} className="animate-spin" /> {progress[backup.id]?.message || 'PROCESSING...'} {progress[backup.id] ? `(${progress[backup.id].percentage}%)` : ''}
-                          </span>
-                        )}
-                        {backup.status === 3 && backup.errorMessage && (
-                          <span className="text-[9px] text-rose-400/80 font-bold uppercase mt-1 flex items-center gap-1">
-                            <AlertCircle size={10} /> {backup.errorMessage}
-                          </span>
-                        )}
-                        {backup.filePath && (
-                          <span className="text-[10px] text-slate-500 font-bold truncate max-w-[200px] mt-1">{backup.filePath}</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border ${
-                        backup.type === 1 
-                        ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/20' 
-                        : 'bg-brand-secondary/10 text-brand-secondary border-brand-secondary/20'
-                      }`}>
-                        {backup.type === 1 ? 'DATABASE' : 'VOLUME'}
-                      </span>
-                    </td>
-                    <td className="px-8 py-5 text-center">
-                      {backup.cloudSyncStatus === 1 ? (
-                        <a href={backup.cloudLink} target="_blank" rel="noopener noreferrer" className="inline-flex p-2 bg-emerald-500/10 text-emerald-400 rounded-xl hover:scale-110 transition-transform">
-                          <Cloud size={16} />
-                        </a>
-                      ) : backup.cloudSyncStatus === 2 ? (
-                        <div className="flex flex-col items-center gap-1 group/error">
-                          <div className="inline-flex p-2 bg-rose-500/10 text-rose-400 rounded-xl cursor-help">
-                            <XCircle size={16} />
-                          </div>
-                          {backup.errorMessage && (
-                            <span className="text-[8px] text-rose-400/80 font-black uppercase tracking-tighter max-w-[80px] text-center leading-[1.1]">
-                              {backup.errorMessage}
+        <div className="bg-obsidian-900/50 border border-white/10 rounded-[2.5rem] overflow-hidden backdrop-blur-3xl shadow-2xl min-h-[500px] flex flex-col">
+          {activeTab === 'history' ? (
+            <>
+              <div className="overflow-x-auto custom-scrollbar flex-1">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 bg-white/2">
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Resource</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Type</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Cloud</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Metric</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Timestamp</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Ops</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {backups
+                      .slice((historyPage - 1) * itemsPerPage, historyPage * itemsPerPage)
+                      .map((backup) => (
+                        <tr key={backup.id} className="hover:bg-white/2 transition-colors group">
+                          <td className="px-8 py-5">
+                            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-white/5">
+                              {getStatusIcon(backup.status)}
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex flex-col text-left">
+                              <span className="text-xs font-black text-white tracking-tight uppercase line-clamp-1">{backup.name}</span>
+                              {backup.status === 1 && (
+                                <span className="text-[9px] text-brand-primary/80 font-bold uppercase mt-1 flex items-center gap-1">
+                                  <Loader2 size={10} className="animate-spin" /> {progress[backup.id]?.message || 'PROCESSING...'}
+                                </span>
+                              )}
+                              {backup.status === 3 && backup.errorMessage && (
+                                <span className="text-[9px] text-rose-400/80 font-bold uppercase mt-1 flex items-center gap-1">
+                                  <AlertCircle size={10} /> {backup.errorMessage}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border ${
+                              backup.type === 1 
+                              ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/20' 
+                              : 'bg-brand-secondary/10 text-brand-secondary border-brand-secondary/20'
+                            }`}>
+                              {backup.type === 1 ? 'DATABASE' : 'VOLUME'}
                             </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-800 font-black">⎯</span>
-                      )}
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs font-black text-slate-300">{formatSize(backup.size)}</span>
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">{backup.format === 0 ? 'ZIP' : 'TAR.GZ'}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-5 text-[10px] text-slate-500 font-black uppercase">
-                      {format(new Date(backup.createdAt), 'MMM dd | HH:mm:ss')}
-                    </td>
-                    <td className="px-8 py-5 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
-                        <button 
-                          onClick={() => handleDownload(backup.id, backup.name, backup.filePath)}
-                          className="p-2.5 bg-white/5 text-slate-400 hover:text-white rounded-xl transition-colors"
-                        >
-                          <Download size={14} />
-                        </button>
-                        <button onClick={() => handleDelete(backup.id)} className="p-2.5 bg-rose-500/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"><Trash2 size={14} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {backups.length === 0 && !loading && (
-                  <tr>
-                    <td colSpan={7} className="px-8 py-32 text-center">
-                      <div className="flex flex-col items-center gap-6 opacity-20">
-                        <Database size={64} className="animate-pulse" />
-                        <span className="text-xs font-black uppercase tracking-[0.8em]">Vault is empty</span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            {backup.cloudSyncStatus === 1 ? (
+                              <a href={backup.cloudLink} target="_blank" rel="noopener noreferrer" className="inline-flex p-2 bg-emerald-500/10 text-emerald-400 rounded-xl hover:scale-110 transition-transform">
+                                <Cloud size={16} />
+                              </a>
+                            ) : backup.cloudSyncStatus === 2 ? (
+                              <div className="flex flex-col items-center gap-1 group/error">
+                                <div className="inline-flex p-2 bg-rose-500/10 text-rose-400 rounded-xl cursor-help">
+                                  <XCircle size={16} />
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-800 font-black">⎯</span>
+                            )}
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs font-black text-slate-300">{formatSize(backup.size)}</span>
+                              <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter">{backup.format === 0 ? 'ZIP' : 'TAR.GZ'}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-[10px] text-slate-500 font-black uppercase">
+                            {format(new Date(backup.createdAt), 'MMM dd | HH:mm:ss')}
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                              <button 
+                                onClick={() => handleDownload(backup.id, backup.name, backup.filePath)}
+                                className="p-2.5 bg-white/5 text-slate-400 hover:text-white rounded-xl transition-colors"
+                              >
+                                <Download size={14} />
+                              </button>
+                              <button onClick={() => handleDelete(backup.id)} className="p-2.5 bg-rose-500/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    {backups.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={7} className="px-8 py-32 text-center">
+                          <div className="flex flex-col items-center gap-6 opacity-20">
+                            <Database size={64} className="animate-pulse" />
+                            <span className="text-xs font-black uppercase tracking-[0.8em]">Vault is empty</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination 
+                currentPage={historyPage} 
+                totalItems={backups.length} 
+                itemsPerPage={itemsPerPage} 
+                onPageChange={setHistoryPage} 
+              />
+            </>
+          ) : (
+            <>
+              <div className="overflow-x-auto custom-scrollbar flex-1">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/5 bg-white/2">
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Protocol Alias</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Resource</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Storage</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Frequency</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500">Next Run</th>
+                      <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Ops</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {schedules
+                      .slice((schedulesPage - 1) * itemsPerPage, schedulesPage * itemsPerPage)
+                      .map((s) => (
+                        <tr key={s.id} className="hover:bg-white/2 transition-colors group">
+                          <td className="px-8 py-5">
+                            <button 
+                              onClick={() => handleToggleScheduleAsync(s)}
+                              className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${s.isActive ? 'bg-emerald-500 shadow-[0_0_10px_rgba(52,211,153,0.3)]' : 'bg-white/10'}`}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${s.isActive ? 'translate-x-5' : 'translate-x-0 bg-slate-400'}`}
+                              />
+                            </button>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className="text-xs font-black text-white uppercase tracking-tight">{s.name}</span>
+                          </td>
+                          <td className="px-8 py-5">
+                            <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border ${
+                              s.type === 1 
+                              ? 'bg-brand-primary/10 text-brand-primary border-brand-primary/20' 
+                              : 'bg-brand-secondary/10 text-brand-secondary border-brand-secondary/20'
+                            }`}>
+                              {s.type === 1 ? 'DATABASE' : 'VOLUME'}
+                            </span>
+                          </td>
+                          <td className="px-8 py-5">
+                            <div className="flex items-center justify-center gap-2">
+                               <div className={`p-1.5 rounded-lg ${!s.syncToCloud ? 'text-slate-500' : s.keepLocal ? 'text-emerald-400 bg-emerald-500/5' : 'text-brand-primary bg-brand-primary/5'}`}>
+                                 {!s.syncToCloud ? <FolderSync size={14} /> : s.keepLocal ? <Cloud size={14} /> : <Download size={14} />}
+                               </div>
+                               <span className="text-[9px] font-black text-slate-500 uppercase">
+                                 {!s.syncToCloud ? 'LCL' : s.keepLocal ? 'S+C' : 'CLD'}
+                               </span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5">
+                             <span className="text-[10px] font-black text-slate-300 uppercase">
+                               {s.useCron ? (
+                                 s.cronExpression?.split(' ')[4] === '*' ? 'Daily Routine' : 'Weekly Cycle'
+                               ) : `Every ${s.intervalMinutes}m`}
+                             </span>
+                          </td>
+                          <td className="px-8 py-5">
+                             <span className="text-[10px] font-black text-slate-500 uppercase">
+                               {s.nextRun ? format(new Date(s.nextRun), 'HH:mm | MMM dd') : '—'}
+                             </span>
+                          </td>
+                          <td className="px-8 py-5 text-right">
+                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                               <button 
+                                 onClick={() => handleEditSchedule(s)}
+                                 className="p-2.5 bg-white/5 text-slate-400 hover:text-brand-primary rounded-xl transition-colors"
+                               >
+                                 <Settings size={14} />
+                               </button>
+                               <button 
+                                 onClick={() => confirmDeleteSchedule(s.id)}
+                                 className="p-2.5 bg-rose-500/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
+                                >
+                                 <Trash2 size={14} />
+                               </button>
+                             </div>
+                          </td>
+                        </tr>
+                      ))}
+                    {schedules.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="px-8 py-32 text-center">
+                          <div className="flex flex-col items-center gap-6 opacity-20">
+                            <Clock size={64} className="animate-pulse" />
+                            <span className="text-xs font-black uppercase tracking-[0.8em]">No Protocols defined</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <Pagination 
+                currentPage={schedulesPage} 
+                totalItems={schedules.length} 
+                itemsPerPage={itemsPerPage} 
+                onPageChange={setSchedulesPage} 
+              />
+            </>
+          )}
         </div>
       </section>
 
@@ -1172,104 +1354,37 @@ const Backups = () => {
         />
       )}
 
-      {/* Existing Schedules Display (Bottom Section) */}
-      <section className="mt-12 space-y-6">
-        <div className="flex items-center gap-3">
-          <Clock className="w-4 h-4 text-emerald-400" />
-          <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Automation Protocols</h2>
-        </div>
-        {/* Delete Confirmation Modal */}
-        <Modal
-          isOpen={showScheduleDeleteConfirm}
-          onClose={() => setShowScheduleDeleteConfirm(false)}
-          title="Terminal Purge"
-          type="danger"
-          footer={
-            <>
-              <button onClick={() => setShowScheduleDeleteConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Abort</button>
-              <button onClick={handleDeleteSchedule} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Purge Protocol</button>
-            </>
-          }
-        >
-          Are you sure you want to permanently decommission this automated backup protocol? Active timers will be halted and recurring task entries will be purged from the system registry.
-        </Modal>
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={showScheduleDeleteConfirm}
+        onClose={() => setShowScheduleDeleteConfirm(false)}
+        title="Terminal Purge"
+        type="danger"
+        footer={
+          <>
+            <button onClick={() => setShowScheduleDeleteConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Abort</button>
+            <button onClick={handleDeleteSchedule} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Purge Protocol</button>
+          </>
+        }
+      >
+        Are you sure you want to permanently decommission this automated backup protocol? Active timers will be halted and recurring task entries will be purged from the system registry.
+      </Modal>
 
-        {/* Drive Disconnect Modal */}
-        <Modal
-          isOpen={showDriveDisconnectConfirm}
-          onClose={() => setShowDriveDisconnectConfirm(false)}
-          title="Cloud Severance"
-          type="warning"
-          footer={
-            <>
-              <button onClick={() => setShowDriveDisconnectConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Cancel</button>
-              <button onClick={handleDisconnectDrive} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Disconnect Cloud</button>
-            </>
-          }
-        >
-          Disconnecting Google Drive will immediately halt all automated cloud synchronization pipelines. You will need to re-verify authentication credentials to restore cloud relay capabilities.
-        </Modal>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {schedules.map(s => (
-            <div key={s.id} className="bg-white/5 border border-white/5 rounded-3xl p-6 flex flex-col justify-between group hover:border-emerald-500/20 transition-all">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-sm font-black text-white uppercase">{s.name}</h3>
-                  <p className="text-[9px] text-slate-500 uppercase font-black mt-1">
-                    {s.useCron ? (
-                      <span className="text-brand-primary">
-                        {s.cronExpression?.split(' ')[4] === '*' ? 'Daily' : 'Weekly'} 
-                        {' at ' + s.cronExpression?.split(' ')[1].padStart(2, '0') + ':' + s.cronExpression?.split(' ')[0].padStart(2, '0')}
-                      </span>
-                    ) : (
-                      `Every ${s.intervalMinutes} min`
-                    )} | 
-                    <span className="text-emerald-400 ml-1">{s.type === 1 ? 'DATABASE' : 'VOLUME'}</span>
-                  </p>
-                </div>
-                <div className={`px-2 py-1 rounded bg-white/5 text-[8px] font-black uppercase ${s.isActive ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {s.isActive ? 'Active' : 'Paused'}
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-4 border-t border-white/5">
-                <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-lg border ${
-                    !s.syncToCloud ? 'bg-slate-500/5 border-slate-500/10 text-slate-500' :
-                    s.keepLocal ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400' :
-                    'bg-brand-primary/5 border-brand-primary/10 text-brand-primary'
-                  }`}>
-                    {!s.syncToCloud ? <FolderSync size={10} /> : s.keepLocal ? <Cloud size={10} /> : <Download size={10} />}
-                  </div>
-                  <span className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">
-                    {!s.syncToCloud ? 'Local Only' : s.keepLocal ? 'Server + Cloud' : 'Cloud Only'}
-                  </span>
-                </div>
-                <span className="text-[8px] text-slate-600 font-bold uppercase">Next: {s.nextRun ? format(new Date(s.nextRun), 'HH:mm | MMM dd') : 'N/A'}</span>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => handleEditSchedule(s)}
-                    className="p-2 bg-white/5 border border-white/5 rounded-xl text-slate-500 hover:text-brand-primary hover:border-brand-primary/20 transition-all"
-                  >
-                    <Settings size={14} />
-                  </button>
-                  <button 
-                    onClick={() => confirmDeleteSchedule(s.id)}
-                    className="p-2 bg-white/5 border border-white/5 rounded-xl text-slate-500 hover:text-rose-400 hover:border-rose-500/20 transition-all"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          {schedules.length === 0 && (
-            <div className="col-span-full py-12 text-center bg-white/1 border border-dashed border-white/10 rounded-3xl">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">No automated tasks defined</p>
-            </div>
-          )}
-        </div>
-      </section>
+      {/* Drive Disconnect Modal */}
+      <Modal
+        isOpen={showDriveDisconnectConfirm}
+        onClose={() => setShowDriveDisconnectConfirm(false)}
+        title="Cloud Severance"
+        type="warning"
+        footer={
+          <>
+            <button onClick={() => setShowDriveDisconnectConfirm(false)} className="px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:text-white transition-all">Cancel</button>
+            <button onClick={handleDisconnectDrive} className="bg-rose-500 text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20">Disconnect Cloud</button>
+          </>
+        }
+      >
+        Disconnecting Google Drive will immediately halt all automated cloud synchronization pipelines. You will need to re-verify authentication credentials to restore cloud relay capabilities.
+      </Modal>
 
       <VaultOverlay
         isOpen={isDeleteModalOpen}
