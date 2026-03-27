@@ -110,6 +110,7 @@ export interface WebMonitor {
   isActive: boolean;
   lastCheckTime?: string;
   lastStatusUp: boolean;
+  status: number;
   lastLatencyMs: number;
 }
 

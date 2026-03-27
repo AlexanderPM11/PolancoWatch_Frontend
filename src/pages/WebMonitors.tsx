@@ -25,16 +25,30 @@ const formatInterval = (seconds: number): string => {
     return `${seconds}s`;
 };
 
-const StatusBadge = ({ up }: { up: boolean }) => (
-    <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-        up 
-        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-        : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-    }`}>
-        <div className={`w-1.5 h-1.5 rounded-full ${up ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></div>
-        {up ? 'Operational' : 'Down'}
-    </div>
-);
+const StatusBadge = ({ status }: { status: number }) => {
+    const isUp = status === 0;
+    const isChecking = status === 1;
+
+    if (isChecking) {
+        return (
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]`}>
+                <RefreshCw size={10} className="animate-spin text-amber-400" />
+                Checking...
+            </div>
+        );
+    }
+
+    return (
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+            isUp 
+            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
+            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+        }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></div>
+            {isUp ? 'Operational' : 'Down'}
+        </div>
+    );
+};
 
 const MonitorCard = ({ monitor, confirmDelete, onToggle, onEdit }: { 
     monitor: WebMonitor, 
@@ -72,7 +86,7 @@ const MonitorCard = ({ monitor, confirmDelete, onToggle, onEdit }: {
                         </a>
                     </div>
                 </div>
-                <StatusBadge up={monitor.lastStatusUp && monitor.isActive} />
+                <StatusBadge status={monitor.status} />
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
@@ -296,6 +310,25 @@ export default function WebMonitors() {
                         </p>
                     </div>
 
+                    <div className="flex flex-col items-end gap-3">
+                        <div className="flex items-center gap-4 bg-white/5 border border-white/5 px-6 py-3 rounded-2xl backdrop-blur-md">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80">Up: Operativo</span>
+                            </div>
+                            <div className="w-px h-3 bg-white/10"></div>
+                            <div className="flex items-center gap-2">
+                                <RefreshCw size={10} className="text-amber-400 animate-spin" />
+                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/80">Checking: Verificando</span>
+                            </div>
+                            <div className="w-px h-3 bg-white/10"></div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-rose-400"></div>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-rose-400/80">Down: No disponible</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex items-center gap-4">
                         <div className="relative group">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-primary transition-colors" size={18} />
@@ -318,14 +351,23 @@ export default function WebMonitors() {
                 </div>
 
                 {/* Dashboard Stats (Optional) */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
                         <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
                             <ShieldCheck size={24} />
                         </div>
                         <div>
                             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Healthy Sites</div>
-                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.lastStatusUp && m.isActive).length}</div>
+                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.status === 0 && m.isActive).length}</div>
+                        </div>
+                    </div>
+                    <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400">
+                            <RefreshCw size={24} className="animate-spin" />
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Verifying Status</div>
+                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.status === 1 && m.isActive).length}</div>
                         </div>
                     </div>
                     <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
@@ -334,7 +376,7 @@ export default function WebMonitors() {
                         </div>
                         <div>
                             <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Down Sites</div>
-                            <div className="text-3xl font-black text-white">{monitors.filter(m => !m.lastStatusUp && m.isActive).length}</div>
+                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.status === 2 && m.isActive).length}</div>
                         </div>
                     </div>
                     <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
