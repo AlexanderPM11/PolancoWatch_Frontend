@@ -3,10 +3,7 @@ import {
     Activity, 
     Plus, 
     Trash2, 
-    ExternalLink, 
     ShieldCheck, 
-    ShieldAlert, 
-    Clock, 
     RefreshCw,
     ToggleLeft,
     ToggleRight,
@@ -25,32 +22,9 @@ const formatInterval = (seconds: number): string => {
     return `${seconds}s`;
 };
 
-const StatusBadge = ({ status }: { status: number }) => {
-    const isUp = status === 0;
-    const isChecking = status === 1;
 
-    if (isChecking) {
-        return (
-            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]`}>
-                <RefreshCw size={10} className="animate-spin text-amber-400" />
-                Checking...
-            </div>
-        );
-    }
 
-    return (
-        <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-            isUp 
-            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]' 
-            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-        }`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${isUp ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></div>
-            {isUp ? 'Operational' : 'Down'}
-        </div>
-    );
-};
-
-const MonitorCard = ({ monitor, confirmDelete, onToggle, onEdit }: { 
+const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: { 
     monitor: WebMonitor, 
     confirmDelete: (id: number) => void,
     onToggle: (id: number) => void,
@@ -70,92 +44,92 @@ const MonitorCard = ({ monitor, confirmDelete, onToggle, onEdit }: {
         fetchHistory();
     }, [monitor.id, monitor.lastCheckTime]);
 
+    const isUp = monitor.status === 0;
+    const isChecking = monitor.status === 1;
+
     return (
-        <div className="bg-obsidian-900/40 backdrop-blur-3xl border border-white/5 rounded-3xl p-6 transition-all duration-300 hover:border-brand-primary/30 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-brand-primary/10 transition-colors"></div>
-            
-            <div className="flex justify-between items-start mb-6 relative z-10">
-                <div className="space-y-1">
-                    <h3 className="text-lg font-black tracking-tight text-white group-hover:text-brand-primary transition-colors">
-                        {monitor.name}
-                    </h3>
-                    <div className="flex items-center gap-2 text-slate-500 text-xs font-medium">
-                        <span className="truncate max-w-[200px]">{monitor.url}</span>
-                        <a href={monitor.url} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
-                            <ExternalLink size={12} />
-                        </a>
-                    </div>
-                </div>
-                <StatusBadge status={monitor.status} />
+        <div className="flex items-center gap-4 py-3 px-6 border-b border-white/5 hover:bg-white/2 transition-all group">
+            <div 
+                className="w-8 flex justify-center cursor-help"
+                title={monitor.lastCheckTime ? `Last Check: ${new Date(monitor.lastCheckTime).toLocaleString('es-DO', { 
+                    timeZone: 'America/Santo_Domingo',
+                    dateStyle: 'medium',
+                    timeStyle: 'medium'
+                })}` : 'Never Checked'}
+            >
+                {isChecking ? (
+                    <RefreshCw size={14} className="text-amber-400 animate-spin" />
+                ) : (
+                    <div className={`w-2.5 h-2.5 rounded-full ${isUp ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)] animate-pulse' : 'bg-rose-400 shadow-[0_0_8px_rgba(248,113,113,0.4)]'}`}></div>
+                )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6 relative z-10">
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                    <div className="flex items-center gap-2 text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                        <Activity size={10} className="text-brand-primary" />
-                        Latency
-                    </div>
-                    <div className="text-xl font-black text-white">
+            {/* Identity */}
+            <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                <span className="text-sm font-bold text-white truncate group-hover:text-brand-primary transition-colors">
+                    {monitor.name}
+                </span>
+                <span className="text-[10px] font-medium text-slate-500 truncate uppercase tracking-wider">
+                    {monitor.url.replace(/^https?:\/\//, '')}
+                </span>
+            </div>
+
+            {/* Performance Metrics */}
+            <div className="hidden lg:flex items-center gap-8 px-4">
+                <div className="w-20 text-right">
+                    <span className="text-xs font-black text-white">
                         {monitor.lastLatencyMs > 0 ? `${monitor.lastLatencyMs.toFixed(0)}ms` : '--'}
-                    </div>
+                    </span>
+                    <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Latency</div>
                 </div>
-                <div className="bg-white/5 rounded-2xl p-4 border border-white/5">
-                    <div className="flex items-center gap-2 text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                        <Clock size={10} className="text-brand-secondary" />
-                        Interval
-                    </div>
-                    <div className="text-xl font-black text-white">
+                <div className="w-20 text-right">
+                    <span className="text-xs font-black text-white">
                         {formatInterval(monitor.checkIntervalSeconds)}
-                    </div>
+                    </span>
+                    <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Freq</div>
                 </div>
             </div>
 
-            {/* Sparkline-like history */}
-            <div className="flex gap-1 h-6 mb-6">
+            {/* Modern Status Dots History - Perfectly Round 10px */}
+            <div className="hidden md:flex items-center flex-1 px-8 min-w-[300px] max-w-[600px] gap-2.5">
                 {Array.from({ length: 20 }).map((_, i) => {
-                    const check = history[19 - i]; // Reverse order to show left-to-right
-                    const status = check ? (check.isUp ? 'bg-emerald-500/40' : 'bg-rose-500/40') : 'bg-white/5';
+                    const check = history[19 - i];
+                    const status = check 
+                        ? (check.isUp ? 'bg-emerald-500' : 'bg-rose-500') 
+                        : 'bg-white/5';
+                    
                     return (
                         <div 
                             key={i} 
-                            className={`flex-1 rounded-sm ${status} transition-all duration-300 hover:scale-y-125`}
-                            title={check ? `${new Date(check.timestamp).toLocaleTimeString()}: ${check.isUp ? 'UP' : 'DOWN'}` : 'No data'}
+                            className={`w-[10px] h-[10px] flex-none rounded-full ${status} transition-all hover:scale-150 hover:brightness-125`}
+                            title={check ? `${new Date(check.timestamp).toLocaleString('es-DO', { timeZone: 'America/Santo_Domingo' })}: ${check.isUp ? 'UP' : 'DOWN'}` : 'No data'}
                         ></div>
                     );
                 })}
             </div>
 
-            <div className="flex justify-between items-center pt-4 border-t border-white/5 relative z-10">
-                <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-                    Last Check: {monitor.lastCheckTime ? new Date(monitor.lastCheckTime).toLocaleTimeString() : 'Never'}
-                </div>
-                <div className="flex items-center gap-2">
-                    <button 
-                        onClick={() => onToggle(monitor.id)}
-                        className={`p-2 rounded-xl transition-all ${
-                            monitor.isActive 
-                            ? 'text-brand-primary hover:bg-brand-primary/10' 
-                            : 'text-slate-500 hover:bg-white/5'
-                        }`}
-                        title={monitor.isActive ? "Deactivate" : "Activate"}
-                    >
-                        {monitor.isActive ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
-                    </button>
-                    <button 
-                        onClick={() => onEdit(monitor)}
-                        className="p-2 rounded-xl text-slate-500 hover:text-brand-primary hover:bg-brand-primary/10 transition-all"
-                        title="Edit Monitor"
-                    >
-                        <Pencil size={18} />
-                    </button>
-                    <button 
-                        onClick={() => confirmDelete(monitor.id)}
-                        className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
-                        title="Delete Monitor"
-                    >
-                        <Trash2 size={18} />
-                    </button>
-                </div>
+            {/* Actions */}
+            <div className="flex items-center gap-1 ml-6 opacity-40 group-hover:opacity-100 transition-opacity">
+                <button 
+                    onClick={() => onToggle(monitor.id)}
+                    className={`p-2 rounded-lg transition-all ${
+                        monitor.isActive ? 'text-brand-primary hover:bg-brand-primary/10' : 'text-slate-500 hover:bg-white/5'
+                    }`}
+                >
+                    {monitor.isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                </button>
+                <button 
+                    onClick={() => onEdit(monitor)}
+                    className="p-2 rounded-lg text-slate-500 hover:text-brand-primary hover:bg-brand-primary/10 transition-all"
+                >
+                    <Pencil size={16} />
+                </button>
+                <button 
+                    onClick={() => confirmDelete(monitor.id)}
+                    className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                >
+                    <Trash2 size={16} />
+                </button>
             </div>
         </div>
     );
@@ -293,140 +267,111 @@ export default function WebMonitors() {
                 Are you sure you want to decommission this monitoring node? This action is irreversible and all historical latency data will be purged.
             </Modal>
             <div className="max-w-7xl mx-auto space-y-12">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary shadow-[0_0_20px_rgba(167,139,250,0.1)]">
-                                <ShieldCheck size={24} />
-                            </div>
-                            <span className="text-xs font-black uppercase tracking-[0.3em] text-brand-primary">Module: Web_Monitor_v1</span>
-                        </div>
-                        <h1 className="text-5xl font-black tracking-tighter text-white">
-                            Web <span className="text-brand-secondary">Monitors</span>
-                        </h1>
-                        <p className="text-slate-400 max-w-lg text-lg leading-relaxed font-medium">
-                            Real-time health tracking and alert management for your distributed web applications.
-                        </p>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-3">
-                        <div className="flex items-center gap-4 bg-white/5 border border-white/5 px-6 py-3 rounded-2xl backdrop-blur-md">
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400/80">Up: Operativo</span>
-                            </div>
-                            <div className="w-px h-3 bg-white/10"></div>
-                            <div className="flex items-center gap-2">
-                                <RefreshCw size={10} className="text-amber-400 animate-spin" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-400/80">Checking: Verificando</span>
-                            </div>
-                            <div className="w-px h-3 bg-white/10"></div>
-                            <div className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-rose-400"></div>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-rose-400/80">Down: No disponible</span>
-                            </div>
-                        </div>
-                    </div>
-
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-brand-primary/10 border border-brand-primary/20 flex items-center justify-center text-brand-primary">
+                            <ShieldCheck size={20} />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black tracking-tight text-white leading-tight">
+                                Web <span className="text-brand-secondary">Monitors</span>
+                            </h1>
+                            <span className="text-[8px] font-black uppercase tracking-[0.3em] text-brand-primary opacity-60">Version_Control: v1.2</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
                         <div className="relative group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-primary transition-colors" size={18} />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-brand-primary transition-colors" size={16} />
                             <input 
                                 type="text"
-                                placeholder="Search monitors..."
+                                placeholder="Filter endpoints..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-12 pr-6 py-4 rounded-2xl bg-white/5 border border-white/10 text-white placeholder:text-slate-600 focus:outline-hidden focus:border-brand-primary/50 focus:ring-4 focus:ring-brand-primary/10 transition-all w-64 md:w-80 font-medium"
+                                className="pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:outline-hidden focus:border-brand-primary/50 transition-all w-48 md:w-64 font-medium"
                             />
                         </div>
                         <button 
                             onClick={() => setShowAddModal(true)}
-                            className="bg-brand-primary hover:bg-brand-primary/90 text-obsidian-950 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-brand-primary/20 active:scale-95 flex items-center gap-3"
+                            className="bg-brand-primary hover:bg-brand-primary/90 text-obsidian-950 px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2"
                         >
-                            <Plus size={18} />
-                            Add Monitor
+                            <Plus size={14} />
+                            New Monitor
                         </button>
                     </div>
                 </div>
 
-                {/* Dashboard Stats (Optional) */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                            <ShieldCheck size={24} />
-                        </div>
-                        <div>
-                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Healthy Sites</div>
-                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.status === 0 && m.isActive).length}</div>
-                        </div>
+                {/* Compact Stats Bar */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <div 
+                        className="bg-emerald-500/5 border border-emerald-500/10 rounded-full px-4 py-1.5 flex items-center gap-2 cursor-help transition-all hover:bg-emerald-500/10"
+                        title="Sites currently responding correctly to all health checks."
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                        <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">
+                            Operational: {monitors.filter(m => m.status === 0 && m.isActive).length}
+                        </span>
                     </div>
-                    <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400">
-                            <RefreshCw size={24} className="animate-spin" />
-                        </div>
-                        <div>
-                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Verifying Status</div>
-                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.status === 1 && m.isActive).length}</div>
-                        </div>
+                    <div 
+                        className="bg-amber-500/5 border border-amber-500/10 rounded-full px-4 py-1.5 flex items-center gap-2 cursor-help transition-all hover:bg-amber-500/10"
+                        title="Initial failure detected. System is performing automatic retries in the background before marking as Offline."
+                    >
+                        <RefreshCw size={10} className="text-amber-400 animate-spin" />
+                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+                            Checking: {monitors.filter(m => m.status === 1 && m.isActive).length}
+                        </span>
                     </div>
-                    <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
-                        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-400">
-                            <ShieldAlert size={24} />
-                        </div>
-                        <div>
-                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Down Sites</div>
-                            <div className="text-3xl font-black text-white">{monitors.filter(m => m.status === 2 && m.isActive).length}</div>
-                        </div>
+                    <div 
+                        className="bg-rose-500/5 border border-rose-500/10 rounded-full px-4 py-1.5 flex items-center gap-2 cursor-help transition-all hover:bg-rose-500/10"
+                        title="Connection failed after all retry attempts. These sites require immediate attention."
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-rose-400"></div>
+                        <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest">
+                            Offline: {monitors.filter(m => m.status === 2 && m.isActive).length}
+                        </span>
                     </div>
-                    <div className="bg-white/5 rounded-3xl p-6 border border-white/5 flex items-center gap-6">
-                        <div className="w-12 h-12 rounded-2xl bg-brand-primary/10 flex items-center justify-center text-brand-primary">
-                            <RefreshCw size={24} className={isLoading ? "animate-spin" : ""} />
-                        </div>
-                        <div>
-                            <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Monitored</div>
-                            <div className="text-3xl font-black text-white">{monitors.length}</div>
-                        </div>
+                    <div className="ml-auto flex items-center gap-2 text-slate-500">
+                        <Activity size={12} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Total Nodes: {monitors.length}</span>
                     </div>
                 </div>
 
-                {/* Monitors Grid */}
-                {isLoading ? (
-                    <div className="flex flex-col items-center justify-center py-32 space-y-6">
-                        <div className="w-12 h-12 border-4 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin"></div>
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-500">Retrieving Telemetry...</span>
+                {/* Monitors List Container */}
+                <div className="bg-obsidian-900/40 backdrop-blur-3xl border border-white/5 rounded-[32px] overflow-hidden">
+                    {/* List Header */}
+                    <div className="hidden md:flex items-center gap-4 px-6 py-4 bg-white/3 border-b border-white/5">
+                        <div className="w-8 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Status</div>
+                        <div className="flex-1 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Monitor Instance</div>
+                        <div className="hidden lg:block w-[176px] text-right text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] px-4">Performance</div>
+                        <div className="flex-1 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] px-8">Health History</div>
+                        <div className="w-24 text-right text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Actions</div>
                     </div>
-                ) : filteredMonitors.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                        {filteredMonitors.map(monitor => (
-                            <MonitorCard 
-                                key={monitor.id} 
-                                monitor={monitor} 
-                                confirmDelete={confirmDelete}
-                                onToggle={handleToggleMonitor}
-                                onEdit={handleEditMonitor}
-                            />
-                        ))}
-                    </div>
-                ) : (
-                    <div className="bg-white/5 border border-white/5 rounded-[40px] p-24 text-center">
-                        <div className="w-20 h-20 bg-brand-primary/10 rounded-3xl flex items-center justify-center text-brand-primary mx-auto mb-8">
-                            <Filter size={32} />
+
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center py-20 gap-4">
+                            <div className="w-8 h-8 border-2 border-brand-primary/20 border-t-brand-primary rounded-full animate-spin"></div>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Syncing...</span>
                         </div>
-                        <h2 className="text-3xl font-black text-white mb-4">No monitors found</h2>
-                        <p className="text-slate-500 max-w-sm mx-auto text-lg mb-12">
-                            {searchQuery ? "Try adjusting your search filters." : "Start by adding your first web application to the monitor."}
-                        </p>
-                        {!searchQuery && (
-                            <button 
-                                onClick={() => setShowAddModal(true)}
-                                className="bg-white/10 hover:bg-white/15 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
-                            >
-                                Get Started
-                            </button>
-                        )}
-                    </div>
-                )}
+                    ) : filteredMonitors.length > 0 ? (
+                        <div className="flex flex-col">
+                            {filteredMonitors.map(monitor => (
+                                <MonitorRow 
+                                    key={monitor.id} 
+                                    monitor={monitor} 
+                                    confirmDelete={confirmDelete}
+                                    onToggle={handleToggleMonitor}
+                                    onEdit={handleEditMonitor}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="py-20 text-center">
+                            <Filter size={24} className="text-slate-700 mx-auto mb-4" />
+                            <h3 className="text-sm font-bold text-slate-400">No matching monitors</h3>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Add Monitor Modal */}
