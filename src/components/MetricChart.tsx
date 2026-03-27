@@ -14,11 +14,29 @@ interface MetricChartProps {
     formatter?: (value: number) => string;
 }
 
+const CustomTooltip = ({ active, payload, label, formatter }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-obsidian-900/90 backdrop-blur-md border border-white/10 rounded-lg p-2 px-3 shadow-2xl pointer-events-none animate-in fade-in zoom-in duration-200">
+                <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black font-mono text-white leading-none">
+                        {formatter(payload[0].value)}
+                    </span>
+                    <span className="text-[7px] font-black font-mono text-slate-500 uppercase tracking-widest mt-1.5 border-t border-white/5 pt-1 w-full text-center">
+                        {format(new Date(label), "d MMM yyyy, HH:mm:ss", { locale: es })}
+                    </span>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 export function MetricChart({ data, color, domain = [0, 100], formatter = (val) => `${val}%` }: MetricChartProps) {
     const gradientId = `color-${color.replace('#', '')}`;
 
     return (
-        <div className="h-full w-full">
+        <div className="h-full w-full overflow-visible">
             <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={data} margin={{ top: 10, right: 0, left: -30, bottom: 0 }}>
                     <defs>
@@ -42,31 +60,9 @@ export function MetricChart({ data, color, domain = [0, 100], formatter = (val) 
                         ticks={[0, 50, 100]}
                     />
                     <Tooltip
-                        contentStyle={{ 
-                            backgroundColor: 'rgba(10, 14, 20, 0.95)', 
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '12px',
-                            color: '#fff',
-                            boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.7)',
-                            padding: '10px 14px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            fontFamily: 'JetBrains Mono, monospace',
-                            backdropFilter: 'blur(10px)'
-                        }}
-                        itemStyle={{ color: color, padding: 0 }}
-                        labelStyle={{ 
-                            display: 'block', 
-                            marginBottom: '6px', 
-                            color: 'rgba(255,255,255,0.7)', 
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            borderBottom: '1px solid rgba(255,255,255,0.1)',
-                            paddingBottom: '4px'
-                        }}
-                        labelFormatter={(label) => format(new Date(label), "d 'de' MMMM 'de' yyyy, HH:mm:ss", { locale: es })}
-                        cursor={{ stroke: 'rgba(255,255,255,0.2)', strokeWidth: 1 }}
-                        formatter={(value: any) => [formatter(value), '']}
+                        content={<CustomTooltip formatter={formatter} />}
+                        position={{ y: 65 }}
+                        cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }}
                     />
                     <Area 
                         type="monotone" 

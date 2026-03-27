@@ -83,14 +83,18 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
                                 : 'Never'}
                         </span>
                     </div>
-                    <div className="flex items-center gap-1">
-                        <span className="text-slate-700">Next:</span>
-                        <span>
-                            {monitor.lastCheckTime 
-                                ? new Date(new Date(monitor.lastCheckTime).getTime() + (monitor.checkIntervalSeconds * 1000)).toLocaleTimeString('es-DO', { hour12: true, hour: 'numeric', minute: '2-digit' }) 
-                                : 'Pending'}
-                        </span>
-                    </div>
+                    {monitor.isActive && monitor.lastCheckTime && (
+                        <div className="flex items-center gap-1">
+                            <span className="text-slate-700">Next:</span>
+                            <span>
+                                {new Date(new Date(monitor.lastCheckTime).getTime() + (monitor.checkIntervalSeconds * 1000)).toLocaleTimeString('es-DO', { 
+                                    hour12: true, 
+                                    hour: 'numeric', 
+                                    minute: '2-digit' 
+                                })}
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
