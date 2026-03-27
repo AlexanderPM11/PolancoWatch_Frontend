@@ -49,12 +49,14 @@ const Combobox = ({
   options, 
   value, 
   onChange, 
-  placeholder = "Select an option..." 
+  placeholder = "Select an option...",
+  allowCustom = false
 }: { 
   options: { name: string, path: string }[], 
   value: string, 
   onChange: (val: string) => void,
-  placeholder?: string
+  placeholder?: string,
+  allowCustom?: boolean
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -83,11 +85,11 @@ const Combobox = ({
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3 cursor-pointer hover:border-brand-primary/50 transition-all"
       >
-        <div className="flex flex-col">
-          <span className={value ? "text-white text-xs font-black truncate max-w-[200px]" : "text-slate-500 text-sm"}>
-            {selectedOption ? selectedOption.name : placeholder}
+        <div className="flex flex-col truncate">
+          <span className={value ? "text-white text-xs font-black truncate" : "text-slate-500 text-sm"}>
+            {selectedOption ? selectedOption.name : (allowCustom && value ? value : placeholder)}
           </span>
-          {selectedOption && <span className="text-[8px] text-slate-500 font-bold truncate max-w-[200px]">{selectedOption.path}</span>}
+          {selectedOption && selectedOption.path !== "" && selectedOption.path !== value && <span className="text-[8px] text-slate-500 font-bold truncate max-w-[200px]">{selectedOption.path}</span>}
         </div>
         <ChevronDown size={16} className={`text-slate-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
@@ -119,12 +121,25 @@ const Combobox = ({
                 className="px-4 py-3 hover:bg-white/5 cursor-pointer transition-colors border-b border-white/5 last:border-none group"
               >
                 <p className="text-xs font-black text-slate-300 group-hover:text-brand-primary transition-colors">{opt.name}</p>
-                <p className="text-[9px] text-slate-500 font-bold mt-1 truncate">{opt.path}</p>
+                {opt.path !== "" && opt.path !== opt.name && <p className="text-[9px] text-slate-500 font-bold mt-1 truncate">{opt.path}</p>}
               </div>
             ))}
-            {filteredOptions.length === 0 && (
+            {filteredOptions.length === 0 && !allowCustom && (
               <div className="px-4 py-8 text-center text-[10px] text-slate-500 uppercase font-black tracking-widest">
-                No matching volumes
+                No matching options
+              </div>
+            )}
+            {allowCustom && search.length > 0 && !options.some(o => o.path.toLowerCase() === search.toLowerCase()) && (
+              <div 
+                onClick={() => {
+                  onChange(search);
+                  setIsOpen(false);
+                  setSearch("");
+                }}
+                className="px-4 py-3 hover:bg-brand-primary/10 cursor-pointer transition-colors border-t border-brand-primary/20 group"
+              >
+                <p className="text-xs font-black text-brand-primary group-hover:text-brand-secondary transition-colors">Use "{search}"</p>
+                <p className="text-[9px] text-brand-primary/60 font-bold mt-1 truncate">Custom Database Name</p>
               </div>
             )}
           </div>
@@ -176,6 +191,9 @@ const Backups = () => {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [schedules, setSchedules] = useState<BackupSchedule[]>([]);
   const [availableVolumes, setAvailableVolumes] = useState<{ name: string, path: string }[]>([]);
+  const [availableContainers, setAvailableContainers] = useState<{ id: string, name: string, state: string, image: string }[]>([]);
+  const [availableDatabases, setAvailableDatabases] = useState<string[]>([]);
+  const [loadingDatabases, setLoadingDatabases] = useState(false);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<Record<string, BackupProgress>>({});
   const [driveConnected, setDriveConnected] = useState<boolean | null>(null);
@@ -193,9 +211,11 @@ const Backups = () => {
     setToast({ message, type });
   };
   
-  // New Backup Form
   const [newBackupType, setNewBackupType] = useState<number>(1); // 1: DB, 0: Volume
   const [newBackupTarget, setNewBackupTarget] = useState("");
+  const [newBackupDbName, setNewBackupDbName] = useState("");
+  const [newBackupDbUser, setNewBackupDbUser] = useState("root");
+  const [newBackupDbPass, setNewBackupDbPass] = useState("");
   const [newBackupName, setNewBackupName] = useState("");
   //storage: 'local' | 'both' | 'drive'
   const [newBackupStorage, setNewBackupStorage] = useState<'local' | 'both' | 'drive'>('local');
@@ -209,6 +229,9 @@ const Backups = () => {
   const [newSchedName, setNewSchedName] = useState("");
   const [newSchedType, setNewSchedType] = useState<number>(1);
   const [newSchedTarget, setNewSchedTarget] = useState("");
+  const [newSchedDbName, setNewSchedDbName] = useState("");
+  const [newSchedDbUser, setNewSchedDbUser] = useState("root");
+  const [newSchedDbPass, setNewSchedDbPass] = useState("");
   const [newSchedInterval, setNewSchedInterval] = useState(1440); // 24h
   const [newSchedStorage, setNewSchedStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newSchedCloudFolderId, setNewSchedCloudFolderId] = useState("");
@@ -252,17 +275,32 @@ const Backups = () => {
     return () => backupSignalRService.disconnect(handleProgress);
   }, []);
 
+  const handleLoadDatabases = async (targetId: string, user: string, pass: string) => {
+    if (!targetId || targetId === "") return;
+    setLoadingDatabases(true);
+    try {
+      const dbs = await backupService.getContainerDatabases(targetId, user, pass);
+      setAvailableDatabases(dbs);
+    } catch {
+      setAvailableDatabases([]);
+    } finally {
+      setLoadingDatabases(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
-      const [backupsData, schedulesData, volumesData, driveStatus] = await Promise.all([
+      const [backupsData, schedulesData, volumesData, containersData, driveStatus] = await Promise.all([
         backupService.getBackups(),
         backupService.getSchedules(),
         backupService.getAvailableVolumes(),
+        backupService.getAvailableContainers(),
         backupService.getDriveStatus().catch(() => ({ isAuthenticated: false }))
       ]);
       setBackups(backupsData);
       setSchedules(schedulesData);
       setAvailableVolumes(volumesData);
+      setAvailableContainers(containersData);
       setDriveConnected(driveStatus.isAuthenticated);
     } catch (error) {
       console.error('Failed to fetch data:', error);
@@ -327,7 +365,8 @@ const Backups = () => {
       const runAsync = async () => {
         try {
           if (newBackupType === 1) {
-            await backupService.triggerDatabaseBackup('Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
+            const finalTarget = newBackupTarget ? `${newBackupTarget}::${newBackupDbName || ""}::${newBackupDbUser}::${newBackupDbPass}` : undefined;
+            await backupService.triggerDatabaseBackup('Zip', finalTarget, syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
           } else {
             await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
           }
@@ -365,7 +404,7 @@ const Backups = () => {
       const scheduleData: Partial<BackupSchedule> = {
         name: newSchedName,
         type: newSchedType,
-        target: newSchedType === 0 ? newSchedTarget : undefined,
+        target: newSchedType === 1 && newSchedTarget ? `${newSchedTarget}::${newSchedDbName || ""}::${newSchedDbUser}::${newSchedDbPass}` : (newSchedTarget || undefined),
         intervalMinutes: schedStrategy === 'interval' ? newSchedInterval : 0,
         format: 0,
         isActive: true,
@@ -394,7 +433,11 @@ const Backups = () => {
   const handleEditSchedule = (s: BackupSchedule) => {
     setNewSchedName(s.name);
     setNewSchedType(s.type);
-    setNewSchedTarget(s.target || "");
+    const targetParts = (s.target || "").split("::");
+    setNewSchedTarget(targetParts[0]);
+    setNewSchedDbName(targetParts.length > 1 ? targetParts[1] : "");
+    setNewSchedDbUser(targetParts.length > 2 ? targetParts[2] : "root");
+    setNewSchedDbPass(targetParts.length > 3 ? targetParts[3] : "");
     setNewSchedInterval(s.intervalMinutes);
     setNewSchedStorage(!s.syncToCloud ? 'local' : s.keepLocal ? 'both' : 'drive');
     setNewSchedCloudFolderId(s.cloudFolderId || "");
@@ -766,7 +809,7 @@ const Backups = () => {
           </button>
         </div>
 
-        {newBackupType === 0 && (
+        {newBackupType === 0 ? (
           <div className="space-y-3 px-1">
             <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Volume Resource</label>
             <Combobox 
@@ -775,6 +818,51 @@ const Backups = () => {
               onChange={setNewBackupTarget} 
               placeholder="Select volume asset..."
             />
+          </div>
+        ) : (
+          <div className="space-y-3 px-1">
+            <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Database Resource</label>
+            <Combobox 
+              options={[
+                { name: 'Internal SQLite Database', path: '' },
+                ...availableContainers.map(c => ({ name: c.name, path: c.id }))
+              ]} 
+              value={newBackupTarget} 
+              onChange={setNewBackupTarget} 
+              placeholder="Select database source..."
+            />
+            {newBackupTarget !== "" && (
+              <div className="mt-4 space-y-4 animate-fade-in">
+                <div className="flex gap-2">
+                  <div className="flex-1 space-y-2">
+                    <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">DB User</label>
+                    <input type="text" placeholder="root" className="w-full bg-black/40 border border-brand-primary/10 rounded-xl px-4 py-2.5 text-[10px] text-white outline-none focus:border-brand-primary/50" value={newBackupDbUser} onChange={(e) => setNewBackupDbUser(e.target.value)} />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Password</label>
+                    <input type="password" placeholder="Leave blank to use Docker env..." className="w-full bg-black/40 border border-brand-primary/10 rounded-xl px-4 py-2.5 text-[10px] text-white outline-none focus:border-brand-primary/50" value={newBackupDbPass} onChange={(e) => setNewBackupDbPass(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2 relative">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Database Name (Optional)</label>
+                    <button onClick={() => handleLoadDatabases(newBackupTarget, newBackupDbUser, newBackupDbPass)} className="text-[8px] text-brand-primary hover:text-brand-secondary font-bold uppercase transition-colors" disabled={loadingDatabases}>
+                      {loadingDatabases ? 'Loading...' : 'Load Databases'}
+                    </button>
+                  </div>
+                  <Combobox 
+                    options={[
+                      { name: '-- All Databases --', path: '' },
+                      ...availableDatabases.map(db => ({ name: db, path: db }))
+                    ]}
+                    value={newBackupDbName}
+                    onChange={setNewBackupDbName}
+                    placeholder={loadingDatabases ? "Loading databases..." : "Select a database..."}
+                    allowCustom={true}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -977,7 +1065,7 @@ const Backups = () => {
             )}
           </div>
 
-          {newSchedType === 0 && (
+          {newSchedType === 0 ? (
             <div className="space-y-3 px-1">
               <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Target Volume</label>
               <Combobox 
@@ -985,6 +1073,51 @@ const Backups = () => {
                 value={newSchedTarget} 
                 onChange={setNewSchedTarget} 
               />
+            </div>
+          ) : (
+            <div className="space-y-3 px-1">
+              <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Database Resource</label>
+              <Combobox 
+                options={[
+                  { name: 'Internal SQLite Database', path: '' },
+                  ...availableContainers.map(c => ({ name: c.name, path: c.id }))
+                ]} 
+                value={newSchedTarget} 
+                onChange={setNewSchedTarget} 
+                placeholder="Select database source..."
+              />
+              {newSchedTarget !== "" && (
+                <div className="mt-4 space-y-4 animate-fade-in">
+                  <div className="flex gap-2">
+                    <div className="flex-1 space-y-2">
+                      <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">DB User</label>
+                      <input type="text" placeholder="root" className="w-full bg-black/40 border border-brand-primary/10 rounded-xl px-4 py-2.5 text-[10px] text-white outline-none focus:border-brand-primary/50" value={newSchedDbUser} onChange={(e) => setNewSchedDbUser(e.target.value)} />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Password</label>
+                      <input type="password" placeholder="Leave blank to use Docker env..." className="w-full bg-black/40 border border-brand-primary/10 rounded-xl px-4 py-2.5 text-[10px] text-white outline-none focus:border-brand-primary/50" value={newSchedDbPass} onChange={(e) => setNewSchedDbPass(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-2 relative">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Database Name (Optional)</label>
+                      <button onClick={() => handleLoadDatabases(newSchedTarget, newSchedDbUser, newSchedDbPass)} className="text-[8px] text-brand-primary hover:text-brand-secondary font-bold uppercase transition-colors" disabled={loadingDatabases}>
+                        {loadingDatabases ? 'Loading...' : 'Load Databases'}
+                      </button>
+                    </div>
+                    <Combobox 
+                      options={[
+                        { name: '-- All Databases --', path: '' },
+                        ...availableDatabases.map(db => ({ name: db, path: db }))
+                      ]}
+                      value={newSchedDbName}
+                      onChange={setNewSchedDbName}
+                      placeholder={loadingDatabases ? "Loading databases..." : "Select a database..."}
+                      allowCustom={true}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

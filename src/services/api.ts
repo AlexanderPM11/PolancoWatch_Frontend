@@ -152,7 +152,7 @@ export interface BackupSchedule {
 
 export interface BackupService {
   getBackups: () => Promise<any[]>;
-  triggerDatabaseBackup: (format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
+  triggerDatabaseBackup: (format: string, target: string | undefined, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
   triggerVolumeBackup: (target: string, format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
   getSchedules: () => Promise<BackupSchedule[]>;
   createSchedule: (schedule: Partial<BackupSchedule>) => Promise<BackupSchedule>;
@@ -162,6 +162,8 @@ export interface BackupService {
   downloadBackup: (id: string, fileName: string) => Promise<void>;
   getAllowedPaths?: () => Promise<string[]>; // Deprecated
   getAvailableVolumes: () => Promise<{ name: string, path: string }[]>;
+  getAvailableContainers: () => Promise<{ id: string, name: string, state: string, image: string }[]>;
+  getContainerDatabases: (containerId: string, user?: string, pass?: string) => Promise<string[]>;
   getDriveStatus: () => Promise<{ isAuthenticated: boolean }>;
   getDriveAuthUrl: () => Promise<{ url: string }>;
   revokeDriveAuth: () => Promise<any>;
@@ -169,8 +171,8 @@ export interface BackupService {
 
 export const backupService: BackupService = {
   getBackups: () => api.get('/api/backups').then(res => res.data),
-  triggerDatabaseBackup: (format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true) => 
-    api.post(`/api/backups/database?format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
+  triggerDatabaseBackup: (format = 'Zip', target?: string, syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true) => 
+    api.post(`/api/backups/database?format=${format}${target ? `&target=${target}` : ''}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
   triggerVolumeBackup: (target: string, format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true) => 
     api.post(`/api/backups/volume?target=${target}&format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
   getSchedules: () => api.get<BackupSchedule[]>('/api/backups/schedules').then(res => res.data),
@@ -190,6 +192,14 @@ export const backupService: BackupService = {
       window.URL.revokeObjectURL(url);
     }),
   getAvailableVolumes: () => api.get<{ name: string, path: string }[]>('/api/backups/config/volumes').then(res => res.data),
+  getAvailableContainers: () => api.get<{ id: string, name: string, state: string, image: string }[]>('/api/backups/config/containers').then(res => res.data),
+  getContainerDatabases: (containerId: string, user?: string, pass?: string) => {
+    const params = new URLSearchParams();
+    if (user) params.append('user', user);
+    if (pass) params.append('pass', pass);
+    const qs = params.toString();
+    return api.get<string[]>(`/api/backups/config/containers/${containerId}/databases${qs ? `?${qs}` : ''}`).then(res => res.data);
+  },
   getDriveStatus: () => api.get<{ isAuthenticated: boolean }>('/api/backups/drive/status').then(res => res.data),
   getDriveAuthUrl: () => api.get<{ url: string }>('/api/backups/drive/auth-url').then(res => res.data),
   revokeDriveAuth: () => api.delete('/api/backups/drive/auth').then(res => res.data),
