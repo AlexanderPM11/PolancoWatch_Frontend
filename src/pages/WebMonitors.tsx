@@ -64,14 +64,34 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
                 )}
             </div>
 
-            {/* Identity */}
-            <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                <span className="text-sm font-bold text-white truncate group-hover:text-brand-primary transition-colors">
-                    {monitor.name}
-                </span>
-                <span className="text-[10px] font-medium text-slate-500 truncate uppercase tracking-wider">
-                    {monitor.url.replace(/^https?:\/\//, '')}
-                </span>
+            {/* Identity & Timestamps */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mb-0.5">
+                    <span className="text-sm font-bold text-white truncate group-hover:text-brand-primary transition-colors">
+                        {monitor.name}
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-500 truncate uppercase tracking-wider">
+                        {monitor.url.replace(/^https?:\/\//, '')}
+                    </span>
+                </div>
+                <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-slate-600">
+                    <div className="flex items-center gap-1">
+                        <span className="text-slate-700">Last:</span>
+                        <span>
+                            {monitor.lastCheckTime 
+                                ? new Date(monitor.lastCheckTime).toLocaleTimeString('es-DO', { hour12: true, hour: 'numeric', minute: '2-digit' }) 
+                                : 'Never'}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <span className="text-slate-700">Next:</span>
+                        <span>
+                            {monitor.lastCheckTime 
+                                ? new Date(new Date(monitor.lastCheckTime).getTime() + (monitor.checkIntervalSeconds * 1000)).toLocaleTimeString('es-DO', { hour12: true, hour: 'numeric', minute: '2-digit' }) 
+                                : 'Pending'}
+                        </span>
+                    </div>
+                </div>
             </div>
 
             {/* Performance Metrics */}
