@@ -17,7 +17,8 @@ import {
   Settings,
   AlertCircle,
   X,
-  History as LucideHistory
+  History as LucideHistory,
+  Play
 } from 'lucide-react';
 import { backupService, type BackupSchedule } from '../services/api';
 import { backupSignalRService } from '../services/backupSignalR';
@@ -239,6 +240,7 @@ const Backups = () => {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [backupToDelete, setBackupToDelete] = useState<string | null>(null);
+  const [runningProtocols, setRunningProtocols] = useState<Record<string, boolean>>({});
 
   // Toast System
   const [toast, setToast] = useState<{ message: string, type: ToastType } | null>(null);
@@ -536,6 +538,45 @@ const Backups = () => {
   const confirmDeleteSchedule = (id: string) => {
     setSchedToDelete(id);
     setShowScheduleDeleteConfirm(true);
+  };
+
+  const handleRunSchedule = async (id: string, name: string) => {
+    try {
+      setRunningProtocols(prev => ({ ...prev, [id]: true }));
+      showToast("Initiating protocol execution...", "loading");
+      
+      // Inject fake progress to immediately show the background task in "Active Pipelines"
+      setProgress(prev => ({
+        ...prev,
+        [`schedule_trigger_${id}`]: { backupId: `schedule_trigger_${id}`, percentage: 0, message: `Starting protocol: ${name}...` }
+      }));
+
+      await backupService.executeSchedule(id);
+      showToast(`Protocol ${name} manually initiated`, "success");
+      
+      // Update the fake progress to done, it will be cleared after 5s by existing logic (or we can just remove it)
+      setProgress(prev => ({
+        ...prev,
+        [`schedule_trigger_${id}`]: { backupId: `schedule_trigger_${id}`, percentage: 100, message: `Protocol ${name} relay sent` }
+      }));
+      setTimeout(() => {
+        setProgress(prev => {
+          const next = { ...prev };
+          delete next[`schedule_trigger_${id}`];
+          return next;
+        });
+        fetchData();
+      }, 3000);
+    } catch (err) {
+      showToast("Manual execution failed", "error");
+      setProgress(prev => {
+        const next = { ...prev };
+        delete next[`schedule_trigger_${id}`];
+        return next;
+      });
+    } finally {
+      setRunningProtocols(prev => ({ ...prev, [id]: false }));
+    }
   };
 
   const handleDelete = (id: string) => {
@@ -937,14 +978,24 @@ const Backups = () => {
                           <td className="px-8 py-5 text-right">
                              <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                                <button 
+                                 onClick={() => handleRunSchedule(s.id, s.name)}
+                                 disabled={runningProtocols[s.id]}
+                                 className="p-2.5 bg-white/5 text-slate-400 hover:text-emerald-400 rounded-xl transition-colors disabled:opacity-50"
+                                 title="Execute Now"
+                               >
+                                 {runningProtocols[s.id] ? <Loader2 size={14} className="animate-spin text-brand-primary" /> : <Play size={14} />}
+                               </button>
+                               <button 
                                  onClick={() => handleEditSchedule(s)}
                                  className="p-2.5 bg-white/5 text-slate-400 hover:text-brand-primary rounded-xl transition-colors"
+                                 title="Edit Protocol"
                                >
                                  <Settings size={14} />
                                </button>
                                <button 
                                  onClick={() => confirmDeleteSchedule(s.id)}
                                  className="p-2.5 bg-rose-500/5 text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
+                                 title="Delete Protocol"
                                 >
                                  <Trash2 size={14} />
                                </button>

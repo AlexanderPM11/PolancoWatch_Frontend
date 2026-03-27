@@ -159,6 +159,7 @@ export interface BackupService {
   createSchedule: (schedule: Partial<BackupSchedule>) => Promise<BackupSchedule>;
   updateSchedule: (id: string, schedule: Partial<BackupSchedule>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
+  executeSchedule: (id: string) => Promise<any>;
   deleteBackup: (id: string) => Promise<any>;
   downloadBackup: (id: string, fileName: string) => Promise<void>;
   getAllowedPaths?: () => Promise<string[]>; // Deprecated
@@ -180,6 +181,7 @@ export const backupService: BackupService = {
   createSchedule: (schedule) => api.post<BackupSchedule>('/api/backups/schedules', schedule).then(res => res.data),
   updateSchedule: (id, schedule) => api.put(`/api/backups/schedules/${id}`, schedule).then(res => res.data),
   deleteSchedule: (id) => api.delete(`/api/backups/schedules/${id}`).then(res => res.data),
+  executeSchedule: (id) => api.post(`/api/backups/schedules/${id}/execute`).then(res => res.data),
   deleteBackup: (id: string) => api.delete(`/api/backups/${id}`),
   downloadBackup: (id: string, fileName: string) => 
     api.get(`/api/backups/${id}/download`, { responseType: 'blob' }).then(res => {
