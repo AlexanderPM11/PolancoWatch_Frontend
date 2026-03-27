@@ -46,6 +46,7 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
 
     const isUp = monitor.status === 0;
     const isChecking = monitor.status === 1;
+    const isSlow = monitor.status === 3;
 
     return (
         <div className="flex items-center gap-4 py-3 px-6 border-b border-white/5 hover:bg-white/2 transition-all group">
@@ -59,6 +60,8 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
             >
                 {isChecking ? (
                     <RefreshCw size={14} className="text-amber-400 animate-spin" />
+                ) : isSlow ? (
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse"></div>
                 ) : (
                     <div className={`w-2.5 h-2.5 rounded-full ${isUp ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)] animate-pulse' : 'bg-rose-400 shadow-[0_0_8px_rgba(248,113,113,0.4)]'}`}></div>
                 )}
@@ -118,15 +121,19 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
             <div className="hidden md:flex items-center flex-1 px-8 min-w-[300px] max-w-[600px] gap-2.5">
                 {Array.from({ length: 20 }).map((_, i) => {
                     const check = history[19 - i];
-                    const status = check 
-                        ? (check.isUp ? 'bg-emerald-500' : 'bg-rose-500') 
-                        : 'bg-white/5';
+                    const status = !check 
+                        ? 'bg-white/5' 
+                        : !check.isUp 
+                            ? 'bg-rose-500' 
+                            : check.isSlow 
+                                ? 'bg-amber-500' 
+                                : 'bg-emerald-500';
                     
                     return (
                         <div 
                             key={i} 
                             className={`w-[10px] h-[10px] flex-none rounded-full ${status} transition-all hover:scale-150 hover:brightness-125`}
-                            title={check ? `${new Date(check.timestamp).toLocaleString('es-DO', { timeZone: 'America/Santo_Domingo' })}: ${check.isUp ? 'UP' : 'DOWN'}` : 'No data'}
+                            title={check ? `${new Date(check.timestamp).toLocaleString('es-DO', { timeZone: 'America/Santo_Domingo' })}: ${!check.isUp ? 'DOWN' : check.isSlow ? 'SLOW' : 'UP'}` : 'No data'}
                         ></div>
                     );
                 })}
@@ -164,7 +171,13 @@ export default function WebMonitors() {
     const [isLoading, setIsLoading] = useState(true);
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingMonitor, setEditingMonitor] = useState<WebMonitor | null>(null);
-    const [newMonitor, setNewMonitor] = useState({ name: '', url: '', interval: 1 });
+    const [newMonitor, setNewMonitor] = useState({ 
+        name: '', 
+        url: '', 
+        interval: 1,
+        slowThresholdMs: 5000,
+        notifyOnSlow: true
+    });
     const [intervalUnit, setIntervalUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('minutes');
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -196,19 +209,29 @@ export default function WebMonitors() {
                     ...editingMonitor,
                     name: newMonitor.name,
                     url: newMonitor.url,
-                    checkIntervalSeconds: intervalSeconds
+                    checkIntervalSeconds: intervalSeconds,
+                    slowThresholdMs: newMonitor.slowThresholdMs,
+                    notifyOnSlow: newMonitor.notifyOnSlow
                 });
             } else {
                 await webMonitorService.createMonitor({
                     name: newMonitor.name,
                     url: newMonitor.url,
                     checkIntervalSeconds: intervalSeconds,
-                    isActive: true
+                    isActive: true,
+                    slowThresholdMs: newMonitor.slowThresholdMs,
+                    notifyOnSlow: newMonitor.notifyOnSlow
                 });
             }
             setShowAddModal(false);
             setEditingMonitor(null);
-            setNewMonitor({ name: '', url: '', interval: 60 });
+            setNewMonitor({ 
+                name: '', 
+                url: '', 
+                interval: 60,
+                slowThresholdMs: 5000,
+                notifyOnSlow: true
+            });
             fetchMonitors();
         } catch (err) {
             console.error(err);
@@ -230,7 +253,9 @@ export default function WebMonitors() {
         setNewMonitor({
             name: monitor.name,
             url: monitor.url,
-            interval: val
+            interval: val,
+            slowThresholdMs: monitor.slowThresholdMs,
+            notifyOnSlow: monitor.notifyOnSlow
         });
         setShowAddModal(true);
     };
@@ -238,7 +263,13 @@ export default function WebMonitors() {
     const handleCloseModal = () => {
         setShowAddModal(false);
         setEditingMonitor(null);
-        setNewMonitor({ name: '', url: '', interval: 1 });
+        setNewMonitor({ 
+            name: '', 
+            url: '', 
+            interval: 1,
+            slowThresholdMs: 5000,
+            notifyOnSlow: true
+        });
         setIntervalUnit('minutes');
     };
 
@@ -355,6 +386,15 @@ export default function WebMonitors() {
                             Offline: {monitors.filter(m => m.status === 2 && m.isActive).length}
                         </span>
                     </div>
+                    <div 
+                        className="bg-amber-500/5 border border-amber-500/10 rounded-full px-4 py-1.5 flex items-center gap-2 cursor-help transition-all hover:bg-amber-500/10"
+                        title="Site is Up but responding slower than the configured threshold."
+                    >
+                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
+                        <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
+                            Slow: {monitors.filter(m => m.status === 3 && m.isActive).length}
+                        </span>
+                    </div>
                     <div className="ml-auto flex items-center gap-2 text-slate-500">
                         <Activity size={12} />
                         <span className="text-[10px] font-black uppercase tracking-widest">Total Nodes: {monitors.length}</span>
@@ -452,6 +492,38 @@ export default function WebMonitors() {
                                         <option value="hours" className="bg-obsidian-900">Hours</option>
                                         <option value="days" className="bg-obsidian-900">Days</option>
                                     </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Slow Threshold (ms)</label>
+                                    <input 
+                                        required
+                                        type="number"
+                                        min="100"
+                                        step="100"
+                                        value={newMonitor.slowThresholdMs}
+                                        onChange={e => setNewMonitor({...newMonitor, slowThresholdMs: parseInt(e.target.value) || 5000})}
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-white focus:outline-hidden focus:border-brand-primary/50 transition-all font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-4">
+                                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4 block">Notifications</label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewMonitor({...newMonitor, notifyOnSlow: !newMonitor.notifyOnSlow})}
+                                        className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all w-full text-left"
+                                    >
+                                        {newMonitor.notifyOnSlow ? (
+                                            <ShieldCheck size={18} className="text-brand-primary" />
+                                        ) : (
+                                            <Activity size={18} className="text-slate-500" />
+                                        )}
+                                        <span className={`text-xs font-bold ${newMonitor.notifyOnSlow ? 'text-white' : 'text-slate-500'}`}>
+                                            {newMonitor.notifyOnSlow ? 'Notify on Slowness' : 'Ignore Slowness'}
+                                        </span>
+                                    </button>
                                 </div>
                             </div>
 

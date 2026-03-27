@@ -112,6 +112,8 @@ export interface WebMonitor {
   lastStatusUp: boolean;
   status: number;
   lastLatencyMs: number;
+  slowThresholdMs: number;
+  notifyOnSlow: boolean;
 }
 
 export interface WebCheck {
@@ -120,6 +122,7 @@ export interface WebCheck {
   timestamp: string;
   isUp: boolean;
   latencyMs: number;
+  isSlow: boolean;
   statusCode: number;
   errorMessage?: string;
 }
