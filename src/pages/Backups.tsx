@@ -255,6 +255,7 @@ const Backups = () => {
   //storage: 'local' | 'both' | 'drive'
   const [newBackupStorage, setNewBackupStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newBackupCloudFolderId, setNewBackupCloudFolderId] = useState("");
+  const [newBackupRetention, setNewBackupRetention] = useState(0);
 
   const [showScheduleDeleteConfirm, setShowScheduleDeleteConfirm] = useState(false);
   const [schedToDelete, setSchedToDelete] = useState<string | null>(null);
@@ -270,6 +271,7 @@ const Backups = () => {
   const [newSchedInterval, setNewSchedInterval] = useState(1440); // 24h
   const [newSchedStorage, setNewSchedStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newSchedCloudFolderId, setNewSchedCloudFolderId] = useState("");
+  const [newSchedRetention, setNewSchedRetention] = useState(0); // 0: keep all
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   
@@ -407,9 +409,9 @@ const Backups = () => {
         try {
           if (newBackupType === 1) {
             const finalTarget = newBackupTarget ? `${newBackupTarget}::${newBackupDbName || ""}::${newBackupDbUser}::${newBackupDbPass}` : undefined;
-            await backupService.triggerDatabaseBackup('Zip', finalTarget, syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
+            await backupService.triggerDatabaseBackup('Zip', finalTarget, syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal, newBackupRetention);
           } else {
-            await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal);
+            await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal, newBackupRetention);
           }
           setNewBackupName("");
           showToast("Backup initiated successfully", "success");
@@ -453,7 +455,8 @@ const Backups = () => {
         cronExpression,
         syncToCloud,
         keepLocal,
-        cloudFolderId: syncToCloud ? newSchedCloudFolderId : undefined
+        cloudFolderId: syncToCloud ? newSchedCloudFolderId : undefined,
+        retentionCount: syncToCloud ? newSchedRetention : 0
       };
 
       if (isEditingSchedule && editingScheduleId) {
@@ -482,6 +485,7 @@ const Backups = () => {
     setNewSchedInterval(s.intervalMinutes);
     setNewSchedStorage(!s.syncToCloud ? 'local' : s.keepLocal ? 'both' : 'drive');
     setNewSchedCloudFolderId(s.cloudFolderId || "");
+    setNewSchedRetention(s.retentionCount || 0);
     
     // Recovery of scheduling state
     if (s.useCron && s.cronExpression) {
@@ -906,6 +910,11 @@ const Backups = () => {
                                <span className="text-[9px] font-black text-slate-500 uppercase">
                                  {!s.syncToCloud ? 'LCL' : s.keepLocal ? 'S+C' : 'CLD'}
                                </span>
+                               {s.syncToCloud && (s.retentionCount ?? 0) > 0 && (
+                                 <span className="text-[8px] font-black bg-brand-primary/20 text-brand-primary px-1.5 py-0.5 rounded-md border border-brand-primary/30">
+                                   R:{s.retentionCount}
+                                 </span>
+                               )}
                             </div>
                           </td>
                           <td className="px-8 py-5">
@@ -1098,6 +1107,23 @@ const Backups = () => {
                 value={newBackupCloudFolderId}
                 onChange={(e) => setNewBackupCloudFolderId(parseFolderId(e.target.value))}
               />
+              <div className="flex items-center gap-3 pt-1">
+                <div className="flex-1 space-y-2">
+                  <label className="text-[8px] font-black uppercase text-brand-secondary/60 tracking-widest ml-1">Retention Limit</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    className="w-full bg-black/40 border border-brand-secondary/10 rounded-lg px-3 py-2 text-[10px] text-brand-secondary outline-none focus:border-brand-secondary/50"
+                    value={newBackupRetention}
+                    onChange={(e) => setNewBackupRetention(parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="flex-[2] pt-4">
+                  <p className="text-[8px] text-slate-500 font-bold uppercase leading-tight italic">
+                    {newBackupRetention === 0 ? "Infinite" : `Latest ${newBackupRetention}`} in cloud
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1114,6 +1140,7 @@ const Backups = () => {
           setNewSchedInterval(1440);
           setNewSchedStorage('local');
           setNewSchedCloudFolderId("");
+          setNewSchedRetention(0);
           setSchedStrategy('interval');
           setCalendarFreq('daily');
           setSelectedDays([]);
@@ -1133,13 +1160,14 @@ const Backups = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Protocol Alias</label>
-              <input 
-                type="text" 
-                placeholder="Name" 
-                className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-sm text-white outline-none focus:border-brand-primary/50"
-                value={newSchedName}
-                onChange={(e) => setNewSchedName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
-              />
+                <input 
+                  type="text" 
+                  placeholder="Name" 
+                  className={`w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3 text-sm text-white outline-none focus:border-brand-primary/50 ${isEditingSchedule ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  value={newSchedName}
+                  onChange={(e) => !isEditingSchedule && setNewSchedName(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))}
+                  disabled={isEditingSchedule}
+                />
             </div>
             <div className="space-y-2">
               <label className="text-[8px] font-black uppercase text-slate-500 tracking-widest ml-1">Asset Class</label>
@@ -1341,6 +1369,23 @@ const Backups = () => {
                 value={newSchedCloudFolderId}
                 onChange={(e) => setNewSchedCloudFolderId(parseFolderId(e.target.value))}
               />
+              <div className="flex items-center gap-3 pt-2">
+                <div className="flex-1 space-y-2">
+                  <label className="text-[8px] font-black uppercase text-brand-primary/60 tracking-widest ml-1">Retention Limit</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    className="w-full bg-black/40 border border-brand-primary/10 rounded-lg px-3 py-2 text-[10px] text-brand-primary outline-none focus:border-brand-primary/50"
+                    value={newSchedRetention}
+                    onChange={(e) => setNewSchedRetention(parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div className="flex-[2] pt-4">
+                  <p className="text-[8px] text-slate-500 font-bold uppercase leading-tight italic">
+                    {newSchedRetention === 0 ? "Infinite backups" : `Keep latest ${newSchedRetention} files`} in cloud
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>

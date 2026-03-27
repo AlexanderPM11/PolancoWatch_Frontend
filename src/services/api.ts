@@ -146,14 +146,15 @@ export interface BackupSchedule {
   useCron: boolean;
   cronExpression?: string;
   cloudFolderId?: string;
+  retentionCount: number;
   lastRun?: string;
   nextRun?: string;
 }
 
 export interface BackupService {
   getBackups: () => Promise<any[]>;
-  triggerDatabaseBackup: (format: string, target: string | undefined, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
-  triggerVolumeBackup: (target: string, format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean) => Promise<any>;
+  triggerDatabaseBackup: (format: string, target: string | undefined, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean, retentionCount?: number) => Promise<any>;
+  triggerVolumeBackup: (target: string, format: string, syncToCloud: boolean, cloudFolderId?: string, backupName?: string, keepLocal?: boolean, retentionCount?: number) => Promise<any>;
   getSchedules: () => Promise<BackupSchedule[]>;
   createSchedule: (schedule: Partial<BackupSchedule>) => Promise<BackupSchedule>;
   updateSchedule: (id: string, schedule: Partial<BackupSchedule>) => Promise<void>;
@@ -171,10 +172,10 @@ export interface BackupService {
 
 export const backupService: BackupService = {
   getBackups: () => api.get('/api/backups').then(res => res.data),
-  triggerDatabaseBackup: (format = 'Zip', target?: string, syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true) => 
-    api.post(`/api/backups/database?format=${format}${target ? `&target=${target}` : ''}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
-  triggerVolumeBackup: (target: string, format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true) => 
-    api.post(`/api/backups/volume?target=${target}&format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}`).then(res => res.data),
+  triggerDatabaseBackup: (format = 'Zip', target?: string, syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true, retentionCount = 0) => 
+    api.post(`/api/backups/database?format=${format}${target ? `&target=${target}` : ''}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}&retentionCount=${retentionCount}`).then(res => res.data),
+  triggerVolumeBackup: (target: string, format = 'Zip', syncToCloud = false, cloudFolderId?: string, backupName?: string, keepLocal = true, retentionCount = 0) => 
+    api.post(`/api/backups/volume?target=${target}&format=${format}&syncToCloud=${syncToCloud}${cloudFolderId ? `&cloudFolderId=${cloudFolderId}` : ''}${backupName ? `&backupName=${backupName}` : ''}&keepLocal=${keepLocal}&retentionCount=${retentionCount}`).then(res => res.data),
   getSchedules: () => api.get<BackupSchedule[]>('/api/backups/schedules').then(res => res.data),
   createSchedule: (schedule) => api.post<BackupSchedule>('/api/backups/schedules', schedule).then(res => res.data),
   updateSchedule: (id, schedule) => api.put(`/api/backups/schedules/${id}`, schedule).then(res => res.data),
