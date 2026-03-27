@@ -16,6 +16,7 @@ import {
   ChevronDown,
   Settings,
   AlertCircle,
+  MessageCircle,
   X,
   History as LucideHistory,
   Play
@@ -258,6 +259,7 @@ const Backups = () => {
   const [newBackupStorage, setNewBackupStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newBackupCloudFolderId, setNewBackupCloudFolderId] = useState("");
   const [newBackupRetention, setNewBackupRetention] = useState(0);
+  const [newBackupSendTelegram, setNewBackupSendTelegram] = useState(false);
 
   const [showScheduleDeleteConfirm, setShowScheduleDeleteConfirm] = useState(false);
   const [schedToDelete, setSchedToDelete] = useState<string | null>(null);
@@ -274,6 +276,7 @@ const Backups = () => {
   const [newSchedStorage, setNewSchedStorage] = useState<'local' | 'both' | 'drive'>('local');
   const [newSchedCloudFolderId, setNewSchedCloudFolderId] = useState("");
   const [newSchedRetention, setNewSchedRetention] = useState(0); // 0: keep all
+  const [newSchedSendTelegram, setNewSchedSendTelegram] = useState(false);
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
   
@@ -411,9 +414,9 @@ const Backups = () => {
         try {
           if (newBackupType === 1) {
             const finalTarget = newBackupTarget ? `${newBackupTarget}::${newBackupDbName || ""}::${newBackupDbUser}::${newBackupDbPass}` : undefined;
-            await backupService.triggerDatabaseBackup('Zip', finalTarget, syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal, newBackupRetention);
+            await backupService.triggerDatabaseBackup('Zip', finalTarget, syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal, newBackupRetention, newBackupSendTelegram);
           } else {
-            await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal, newBackupRetention);
+            await backupService.triggerVolumeBackup(newBackupTarget, 'Zip', syncToCloud, cloudFolderId || undefined, newBackupName || undefined, keepLocal, newBackupRetention, newBackupSendTelegram);
           }
           setNewBackupName("");
           showToast("Backup initiated successfully", "success");
@@ -458,7 +461,8 @@ const Backups = () => {
         syncToCloud,
         keepLocal,
         cloudFolderId: syncToCloud ? newSchedCloudFolderId : undefined,
-        retentionCount: syncToCloud ? newSchedRetention : 0
+        retentionCount: syncToCloud ? newSchedRetention : 0,
+        sendTelegram: newSchedSendTelegram
       };
 
       if (isEditingSchedule && editingScheduleId) {
@@ -488,6 +492,7 @@ const Backups = () => {
     setNewSchedStorage(!s.syncToCloud ? 'local' : s.keepLocal ? 'both' : 'drive');
     setNewSchedCloudFolderId(s.cloudFolderId || "");
     setNewSchedRetention(s.retentionCount || 0);
+    setNewSchedSendTelegram(s.sendTelegram || false);
     
     // Recovery of scheduling state
     if (s.useCron && s.cronExpression) {
@@ -519,6 +524,18 @@ const Backups = () => {
       fetchData();
     } catch (err) {
       showToast("Toggle failed", "error");
+    }
+  };
+
+  const handleToggleTelegramAsync = async (s: BackupSchedule) => {
+    try {
+      showToast(s.sendTelegram ? "Desactivando alertas..." : "Activando alertas...", "loading");
+      const updated = { ...s, sendTelegram: !s.sendTelegram };
+      await backupService.updateSchedule(s.id, updated);
+      showToast(`Alertas de Telegram ${updated.sendTelegram ? 'activadas' : 'desactivadas'} para ${s.name}`, "success");
+      fetchData();
+    } catch (err) {
+      showToast("Error toggling telegram", "error");
     }
   };
 
@@ -978,6 +995,13 @@ const Backups = () => {
                           <td className="px-8 py-5 text-right">
                              <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
                                <button 
+                                 onClick={() => handleToggleTelegramAsync(s)}
+                                 className={`p-2.5 rounded-xl transition-colors ${s.sendTelegram ? 'bg-sky-500/10 text-sky-400 hover:bg-sky-500/20' : 'bg-white/5 text-slate-500 hover:text-sky-400'}`}
+                                 title={s.sendTelegram ? "Desactivar Telegram" : "Activar Telegram"}
+                               >
+                                 <MessageCircle size={14} />
+                               </button>
+                               <button 
                                  onClick={() => handleRunSchedule(s.id, s.name)}
                                  disabled={runningProtocols[s.id]}
                                  className="p-2.5 bg-white/5 text-slate-400 hover:text-emerald-400 rounded-xl transition-colors disabled:opacity-50"
@@ -1183,6 +1207,25 @@ const Backups = () => {
             </div>
           )}
         </div>
+
+        <div className="flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5 mt-4">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl transition-colors ${newBackupSendTelegram ? 'bg-sky-500/20 text-sky-400' : 'bg-white/5 text-slate-500'}`}>
+               <MessageCircle size={16} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-white tracking-widest uppercase">Telegram Alert</p>
+              <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">Notify completion status</p>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setNewBackupSendTelegram(!newBackupSendTelegram)}
+            className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${newBackupSendTelegram ? 'bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.3)]' : 'bg-white/10'}`}
+          >
+            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${newBackupSendTelegram ? 'translate-x-5' : 'translate-x-0 bg-slate-400'}`} />
+          </button>
+        </div>
       </VaultOverlay>
 
       <VaultOverlay
@@ -1197,6 +1240,7 @@ const Backups = () => {
           setNewSchedStorage('local');
           setNewSchedCloudFolderId("");
           setNewSchedRetention(0);
+          setNewSchedSendTelegram(false);
           setSchedStrategy('interval');
           setCalendarFreq('daily');
           setSelectedDays([]);
@@ -1444,6 +1488,25 @@ const Backups = () => {
               </div>
             </div>
           )}
+
+          <div className="flex items-center justify-between p-5 bg-white/5 rounded-3xl border border-white/5 mt-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl transition-colors ${newSchedSendTelegram ? 'bg-sky-500/20 text-sky-400' : 'bg-white/5 text-slate-500'}`}>
+                 <MessageCircle size={16} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-white tracking-widest uppercase">Telegram Alert</p>
+                <p className="text-[8px] text-slate-500 font-bold uppercase mt-1">Notify completion status</p>
+              </div>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setNewSchedSendTelegram(!newSchedSendTelegram)}
+              className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${newSchedSendTelegram ? 'bg-sky-500 shadow-[0_0_10px_rgba(14,165,233,0.3)]' : 'bg-white/10'}`}
+            >
+              <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${newSchedSendTelegram ? 'translate-x-5' : 'translate-x-0 bg-slate-400'}`} />
+            </button>
+          </div>
         </div>
       </VaultOverlay>
 
