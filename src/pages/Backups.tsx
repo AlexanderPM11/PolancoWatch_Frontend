@@ -586,7 +586,7 @@ const Backups = () => {
   };
 
   return (
-    <div className="p-8 pb-20 max-w-7xl mx-auto space-y-12 h-screen overflow-y-auto custom-scrollbar">
+    <div className="p-8 pb-20 max-w-7xl mx-auto space-y-12 h-screen">
       {/* Header */}
       <section className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4 text-brand-primary">
