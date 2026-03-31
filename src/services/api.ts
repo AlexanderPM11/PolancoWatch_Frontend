@@ -114,6 +114,7 @@ export interface WebMonitor {
   lastLatencyMs: number;
   slowThresholdMs: number;
   notifyOnSlow: boolean;
+  notify: boolean;
 }
 
 export interface WebCheck {
@@ -127,6 +128,20 @@ export interface WebCheck {
   errorMessage?: string;
 }
 
+export interface WebMonitorDailyStats {
+  id: number;
+  webMonitorId: number;
+  date: string;
+  upPercentage: number;
+  downPercentage: number;
+  slowPercentage: number;
+  averageLatencyMs: number;
+  totalChecks: number;
+  upCount: number;
+  downCount: number;
+  slowCount: number;
+}
+
 export const webMonitorService = {
   getMonitors: () => api.get<WebMonitor[]>('/api/webmonitors').then(res => res.data),
   getMonitor: (id: number) => api.get<WebMonitor>(`/api/webmonitors/${id}`).then(res => res.data),
@@ -135,6 +150,8 @@ export const webMonitorService = {
   updateMonitor: (id: number, data: Partial<WebMonitor>) => api.put(`/api/webmonitors/${id}`, data).then(res => res.data),
   deleteMonitor: (id: number) => api.delete(`/api/webmonitors/${id}`),
   toggleMonitor: (id: number) => api.post<{ isActive: boolean }>(`/api/webmonitors/${id}/toggle`).then(res => res.data),
+  toggleNotify: (id: number) => api.post<{ notify: boolean }>(`/api/webmonitors/${id}/toggle-notify`).then(res => res.data),
+  getStats: (id: number, days = 15) => api.get<WebMonitorDailyStats[]>(`/api/webmonitors/${id}/stats?days=${days}`).then(res => res.data),
 };
 
 export interface BackupSchedule {

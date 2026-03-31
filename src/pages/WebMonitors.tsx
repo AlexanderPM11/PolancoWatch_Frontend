@@ -5,15 +5,18 @@ import {
     Trash2, 
     ShieldCheck, 
     RefreshCw,
-    ToggleLeft,
-    ToggleRight,
     Search,
     Filter,
-    Pencil
+    Pencil,
+    Eye,
+    Bell,
+    BellOff,
+    Power
 } from 'lucide-react';
 import { webMonitorService } from '../services/api';
-import type { WebMonitor, WebCheck } from '../services/api';
+import type { WebMonitor, WebMonitorDailyStats } from '../services/api';
 import Modal from '../components/Modal';
+import { Link } from 'react-router-dom';
 
 const formatInterval = (seconds: number): string => {
     if (seconds >= 86400 && seconds % 86400 === 0) return `${seconds / 86400}d`;
@@ -24,24 +27,25 @@ const formatInterval = (seconds: number): string => {
 
 
 
-const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: { 
+const MonitorRow = ({ monitor, confirmDelete, onEdit, onToggleNotify, onToggleActive }: { 
     monitor: WebMonitor, 
     confirmDelete: (id: number) => void,
-    onToggle: (id: number) => void,
-    onEdit: (monitor: WebMonitor) => void 
+    onEdit: (monitor: WebMonitor) => void,
+    onToggleNotify: (id: number) => void,
+    onToggleActive: (id: number) => void
 }) => {
-    const [history, setHistory] = useState<WebCheck[]>([]);
+    const [todayStat, setTodayStat] = useState<WebMonitorDailyStats | null>(null);
 
     useEffect(() => {
-        const fetchHistory = async () => {
+        const fetchTodayStat = async () => {
             try {
-                const data = await webMonitorService.getHistory(monitor.id, 20);
-                setHistory(data);
+                const stats = await webMonitorService.getStats(monitor.id, 1);
+                if (stats.length > 0) setTodayStat(stats[0]);
             } catch (err) {
-                console.error("Failed to fetch monitor history", err);
+                console.error("Failed to fetch today's stats", err);
             }
         };
-        fetchHistory();
+        fetchTodayStat();
     }, [monitor.id, monitor.lastCheckTime]);
 
     const isUp = monitor.status === 0;
@@ -52,13 +56,15 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
         <div className="flex items-center gap-4 py-3 px-6 border-b border-white/5 hover:bg-white/2 transition-all group">
             <div 
                 className="w-8 flex justify-center cursor-help"
-                title={monitor.lastCheckTime ? `Last Check: ${new Date(monitor.lastCheckTime).toLocaleString('es-DO', { 
+                title={!monitor.isActive ? 'Monitor Disabled' : monitor.lastCheckTime ? `Last Check: ${new Date(monitor.lastCheckTime).toLocaleString('es-DO', { 
                     timeZone: 'America/Santo_Domingo',
                     dateStyle: 'medium',
                     timeStyle: 'medium'
                 })}` : 'Never Checked'}
             >
-                {isChecking ? (
+                {!monitor.isActive ? (
+                   <div className="w-2.5 h-2.5 rounded-full bg-slate-600 shadow-[0_0_8px_rgba(71,85,105,0.2)]"></div>
+                ) : isChecking ? (
                     <RefreshCw size={14} className="text-amber-400 animate-spin" />
                 ) : isSlow ? (
                     <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)] animate-pulse"></div>
@@ -67,17 +73,20 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
                 )}
             </div>
 
-            {/* Identity & Timestamps */}
+            {/* Identity & URL */}
             <div className="flex-1 min-w-0 flex flex-col justify-center">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mb-0.5">
+                <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-white truncate group-hover:text-brand-primary transition-colors">
                         {monitor.name}
                     </span>
-                    <span className="text-[10px] font-medium text-slate-500 truncate uppercase tracking-wider">
-                        {monitor.url.replace(/^https?:\/\//, '')}
+                    <span className="px-1.5 py-0.5 rounded bg-white/5 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                        {formatInterval(monitor.checkIntervalSeconds)}
                     </span>
                 </div>
-                <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-slate-600">
+                <p className="text-[10px] font-medium text-slate-500 truncate uppercase tracking-wider mt-0.5">
+                    {monitor.url.replace(/^https?:\/\//, '')}
+                </p>
+                <div className="flex items-center gap-3 text-[8px] font-black uppercase tracking-widest text-slate-600 mt-1.5">
                     <div className="flex items-center gap-1">
                         <span className="text-slate-700">Last:</span>
                         <span>
@@ -101,65 +110,67 @@ const MonitorRow = ({ monitor, confirmDelete, onToggle, onEdit }: {
                 </div>
             </div>
 
-            {/* Performance Metrics */}
-            <div className="hidden lg:flex items-center gap-8 px-4">
-                <div className="w-20 text-right">
-                    <span className="text-xs font-black text-white">
-                        {monitor.lastLatencyMs > 0 ? `${monitor.lastLatencyMs.toFixed(0)}ms` : '--'}
+            {/* Today's Status Percentages - Compact */}
+            <div className="hidden lg:flex items-center gap-2 px-4 min-w-[200px]">
+                <div className="flex items-center justify-center px-3 py-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10 min-w-[55px]">
+                    <span className="text-[11px] font-black text-emerald-400">
+                        {todayStat ? todayStat.upPercentage.toFixed(0) : '100'}%
                     </span>
-                    <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Latency</div>
                 </div>
-                <div className="w-20 text-right">
-                    <span className="text-xs font-black text-white">
-                        {formatInterval(monitor.checkIntervalSeconds)}
+                <div className="flex items-center justify-center px-3 py-2 rounded-xl bg-amber-500/5 border border-amber-500/10 min-w-[55px]">
+                    <span className="text-[11px] font-black text-amber-400">
+                        {todayStat ? todayStat.slowPercentage.toFixed(0) : '0'}%
                     </span>
-                    <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest">Freq</div>
+                </div>
+                <div className="flex items-center justify-center px-3 py-2 rounded-xl bg-rose-500/5 border border-rose-500/10 min-w-[55px]">
+                    <span className="text-[11px] font-black text-rose-400">
+                        {todayStat ? todayStat.downPercentage.toFixed(0) : '0'}%
+                    </span>
                 </div>
             </div>
 
-            {/* Modern Status Dots History - Perfectly Round 10px */}
-            <div className="hidden md:flex items-center flex-1 px-8 min-w-[300px] max-w-[600px] gap-2.5">
-                {Array.from({ length: 20 }).map((_, i) => {
-                    const check = history[19 - i];
-                    const status = !check 
-                        ? 'bg-white/5' 
-                        : !check.isUp 
-                            ? 'bg-rose-500' 
-                            : check.isSlow 
-                                ? 'bg-amber-500' 
-                                : 'bg-emerald-500';
-                    
-                    return (
-                        <div 
-                            key={i} 
-                            className={`w-[10px] h-[10px] flex-none rounded-full ${status} transition-all hover:scale-150 hover:brightness-125`}
-                            title={check ? `${new Date(check.timestamp).toLocaleString('es-DO', { timeZone: 'America/Santo_Domingo' })}: ${!check.isUp ? 'DOWN' : check.isSlow ? 'SLOW' : 'UP'}` : 'No data'}
-                        ></div>
-                    );
-                })}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-1 ml-6 opacity-40 group-hover:opacity-100 transition-opacity">
-                <button 
-                    onClick={() => onToggle(monitor.id)}
-                    className={`p-2 rounded-lg transition-all ${
-                        monitor.isActive ? 'text-brand-primary hover:bg-brand-primary/10' : 'text-slate-500 hover:bg-white/5'
-                    }`}
+            {/* Actions - Smaller Buttons */}
+            <div className="flex items-center gap-1.5">
+                <Link
+                    to={`/web-monitors/${monitor.id}`}
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-brand-primary/10 hover:border-brand-primary/30 hover:text-brand-primary transition-all group"
+                    title="Ver Detalles"
                 >
-                    {monitor.isActive ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                    <Eye className="w-3.5 h-3.5" />
+                </Link>
+                <button 
+                    onClick={() => onToggleActive(monitor.id)}
+                    className={`p-2 rounded-xl border transition-all ${
+                        monitor.isActive 
+                        ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400 hover:bg-emerald-500/10' 
+                        : 'bg-slate-500/5 border-slate-500/10 text-slate-500 hover:bg-slate-500/10'
+                    }`}
+                    title={monitor.isActive ? "Desactivar Monitoreo" : "Activar Monitoreo"}
+                >
+                    <Power className="w-3.5 h-3.5" />
+                </button>
+                <button 
+                    onClick={() => onToggleNotify(monitor.id)}
+                    className={`p-2 rounded-xl border transition-all ${
+                        monitor.notify 
+                        ? 'bg-emerald-500/5 border-emerald-500/10 text-emerald-400 hover:bg-emerald-500/10' 
+                        : 'bg-rose-500/5 border-rose-500/10 text-rose-400 hover:bg-rose-500/10'
+                    }`}
+                    title={monitor.notify ? "Notificaciones Activas" : "Notificaciones Silenciadas"}
+                >
+                    {monitor.notify ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
                 </button>
                 <button 
                     onClick={() => onEdit(monitor)}
-                    className="p-2 rounded-lg text-slate-500 hover:text-brand-primary hover:bg-brand-primary/10 transition-all"
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white transition-all"
                 >
-                    <Pencil size={16} />
+                    <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button 
                     onClick={() => confirmDelete(monitor.id)}
-                    className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all"
+                    className="p-2 rounded-xl bg-white/5 border border-white/10 text-rose-500/50 hover:bg-rose-500/10 hover:text-rose-500 transition-all"
                 >
-                    <Trash2 size={16} />
+                    <Trash2 className="w-3.5 h-3.5" />
                 </button>
             </div>
         </div>
@@ -176,7 +187,8 @@ export default function WebMonitors() {
         url: '', 
         interval: 1,
         slowThresholdMs: 5000,
-        notifyOnSlow: true
+        notifyOnSlow: true,
+        notify: true
     });
     const [intervalUnit, setIntervalUnit] = useState<'seconds' | 'minutes' | 'hours' | 'days'>('minutes');
     const [searchQuery, setSearchQuery] = useState('');
@@ -211,7 +223,8 @@ export default function WebMonitors() {
                     url: newMonitor.url,
                     checkIntervalSeconds: intervalSeconds,
                     slowThresholdMs: newMonitor.slowThresholdMs,
-                    notifyOnSlow: newMonitor.notifyOnSlow
+                    notifyOnSlow: newMonitor.notifyOnSlow,
+                    notify: newMonitor.notify
                 });
             } else {
                 await webMonitorService.createMonitor({
@@ -220,7 +233,8 @@ export default function WebMonitors() {
                     checkIntervalSeconds: intervalSeconds,
                     isActive: true,
                     slowThresholdMs: newMonitor.slowThresholdMs,
-                    notifyOnSlow: newMonitor.notifyOnSlow
+                    notifyOnSlow: newMonitor.notifyOnSlow,
+                    notify: newMonitor.notify
                 });
             }
             setShowAddModal(false);
@@ -230,7 +244,8 @@ export default function WebMonitors() {
                 url: '', 
                 interval: 60,
                 slowThresholdMs: 5000,
-                notifyOnSlow: true
+                notifyOnSlow: true,
+                notify: true
             });
             fetchMonitors();
         } catch (err) {
@@ -240,6 +255,24 @@ export default function WebMonitors() {
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [monitorToDelete, setMonitorToDelete] = useState<number | null>(null);
+
+    const handleToggleNotify = async (id: number) => {
+        try {
+            await webMonitorService.toggleNotify(id);
+            fetchMonitors(); 
+        } catch (err) {
+            console.error("Failed to toggle notifications", err);
+        }
+    };
+
+    const handleToggleActive = async (id: number) => {
+        try {
+            await webMonitorService.toggleMonitor(id);
+            fetchMonitors();
+        } catch (err) {
+            console.error("Failed to toggle active status", err);
+        }
+    };
 
     const handleEditMonitor = (monitor: WebMonitor) => {
         setEditingMonitor(monitor);
@@ -255,7 +288,8 @@ export default function WebMonitors() {
             url: monitor.url,
             interval: val,
             slowThresholdMs: monitor.slowThresholdMs,
-            notifyOnSlow: monitor.notifyOnSlow
+            notifyOnSlow: monitor.notifyOnSlow,
+            notify: monitor.notify
         });
         setShowAddModal(true);
     };
@@ -268,7 +302,8 @@ export default function WebMonitors() {
             url: '', 
             interval: 1,
             slowThresholdMs: 5000,
-            notifyOnSlow: true
+            notifyOnSlow: true,
+            notify: true
         });
         setIntervalUnit('minutes');
     };
@@ -284,15 +319,6 @@ export default function WebMonitors() {
             await webMonitorService.deleteMonitor(monitorToDelete);
             setShowDeleteConfirm(false);
             setMonitorToDelete(null);
-            fetchMonitors();
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    const handleToggleMonitor = async (id: number) => {
-        try {
-            await webMonitorService.toggleMonitor(id);
             fetchMonitors();
         } catch (err) {
             console.error(err);
@@ -407,8 +433,7 @@ export default function WebMonitors() {
                     <div className="hidden md:flex items-center gap-4 px-6 py-4 bg-white/3 border-b border-white/5">
                         <div className="w-8 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Status</div>
                         <div className="flex-1 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Monitor Instance</div>
-                        <div className="hidden lg:block w-[176px] text-right text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] px-4">Performance</div>
-                        <div className="flex-1 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] px-8">Health History</div>
+                        <div className="hidden lg:block w-[240px] text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] px-4">Today's Performance</div>
                         <div className="w-24 text-right text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Actions</div>
                     </div>
 
@@ -424,8 +449,9 @@ export default function WebMonitors() {
                                     key={monitor.id} 
                                     monitor={monitor} 
                                     confirmDelete={confirmDelete}
-                                    onToggle={handleToggleMonitor}
                                     onEdit={handleEditMonitor}
+                                    onToggleNotify={handleToggleNotify}
+                                    onToggleActive={handleToggleActive}
                                 />
                             ))}
                         </div>

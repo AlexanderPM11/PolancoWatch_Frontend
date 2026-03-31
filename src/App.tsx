@@ -10,6 +10,7 @@ import ResetPassword from './pages/ResetPassword';
 
 import Profile from './pages/Profile';
 import WebMonitors from './pages/WebMonitors';
+import WebMonitorDetails from './pages/WebMonitorDetails';
 import Backups from './pages/Backups';
 import Sidebar from './components/Sidebar';
 import { authService } from './services/api';
@@ -97,6 +98,16 @@ function App() {
             <PrivateRoute>
               <Layout>
                 <WebMonitors />
+              </Layout>
+            </PrivateRoute>
+          } 
+        />
+        <Route 
+          path="/web-monitors/:id" 
+          element={
+            <PrivateRoute>
+              <Layout>
+                <WebMonitorDetails />
               </Layout>
             </PrivateRoute>
           } 
