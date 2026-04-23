@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/api';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -71,14 +73,23 @@ export default function Login() {
                     
                     <div>
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2.5 ml-1">Security_Key</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-6 py-4 rounded-2xl border border-white/5 bg-obsidian-900/60 text-white text-sm focus:border-brand-secondary/50 focus:ring-4 focus:ring-brand-secondary/5 outline-none transition-all placeholder:text-slate-700 font-mono"
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div className="relative group/field">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full px-6 py-4 rounded-2xl border border-white/5 bg-obsidian-900/60 text-white text-sm focus:border-brand-secondary/50 focus:ring-4 focus:ring-brand-secondary/5 outline-none transition-all placeholder:text-slate-700 font-mono pr-14"
+                                placeholder="••••••••"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-brand-secondary transition-colors p-2"
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
                         <div className="flex justify-end mt-2">
                             <button 
                                 type="button"
@@ -93,9 +104,11 @@ export default function Login() {
                                     try {
                                         const res = await authService.forgotPassword(undefined, username);
                                         if (res.success) {
-                                            setSuccessMessage(`SUCCESS: ${res.message}`);
+                                            setSuccessMessage(`${res.message}`);
                                         } else {
-                                            if (res.message.includes('ERROR_COOLDOWN_ACTIVE')) {
+                                            if (res.message.includes('NOTIFICATIONS_NOT_CONFIGURED')) {
+                                                setError('SECURITY_ERROR: NO NOTIFICATION CHANNELS (TELEGRAM/EMAIL) ARE ACTIVE.');
+                                            } else if (res.message.includes('ERROR_COOLDOWN_ACTIVE')) {
                                                 setError('SECURITY_PROTOCOL_COOLDOWN: PLEASE WAIT A FEW MINUTES BEFORE RETRYING.');
                                             } else {
                                                 setError(`ERROR: ${res.message}`);
@@ -129,5 +142,4 @@ export default function Login() {
             </div>
         </div>
     );
-
 }

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, ShieldCheck, AlertCircle, Save, KeyRound, Fingerprint } from 'lucide-react';
+import { User, ShieldCheck, AlertCircle, Save, KeyRound, Fingerprint, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/api';
 
 export default function Profile() {
@@ -10,6 +10,10 @@ export default function Profile() {
     const [confirmPassword, setConfirmPassword] = useState('');
     
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showVerifyPassword, setShowVerifyPassword] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -88,24 +92,42 @@ export default function Profile() {
                                 <div className="space-y-4">
                                     <div className="relative group">
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">New Passphrase (Optional)</label>
-                                        <input 
-                                            type="password" 
-                                            value={newPassword}
-                                            onChange={(e) => setNewPassword(e.target.value)}
-                                            placeholder="LEAVE BLANK TO KEEP"
-                                            className="w-full bg-obsidian-900/60 border border-white/5 rounded-2xl px-6 py-4 text-sm font-black text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-secondary/50 focus:ring-4 focus:ring-brand-secondary/5 transition-all font-mono"
-                                        />
+                                        <div className="relative group/field">
+                                            <input 
+                                                type={showNewPassword ? "text" : "password"} 
+                                                value={newPassword}
+                                                onChange={(e) => setNewPassword(e.target.value)}
+                                                placeholder="LEAVE BLANK TO KEEP"
+                                                className="w-full bg-obsidian-900/60 border border-white/5 rounded-2xl px-6 py-4 text-sm font-black text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-secondary/50 focus:ring-4 focus:ring-brand-secondary/5 transition-all font-mono pr-14"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-brand-secondary transition-colors p-2"
+                                            >
+                                                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="relative group">
                                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Confirm Transformation</label>
-                                        <input 
-                                            type="password" 
-                                            value={confirmPassword}
-                                            onChange={(e) => setConfirmPassword(e.target.value)}
-                                            placeholder="REPEAT NEW PASSPHRASE"
-                                            className="w-full bg-obsidian-900/60 border border-white/5 rounded-2xl px-6 py-4 text-sm font-black text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-secondary/50 focus:ring-4 focus:ring-brand-secondary/5 transition-all font-mono"
-                                        />
+                                        <div className="relative group/field">
+                                            <input 
+                                                type={showConfirmPassword ? "text" : "password"} 
+                                                value={confirmPassword}
+                                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                                placeholder="REPEAT NEW PASSPHRASE"
+                                                className="w-full bg-obsidian-900/60 border border-white/5 rounded-2xl px-6 py-4 text-sm font-black text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-secondary/50 focus:ring-4 focus:ring-brand-secondary/5 transition-all font-mono pr-14"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-brand-secondary transition-colors p-2"
+                                            >
+                                                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -116,14 +138,23 @@ export default function Profile() {
                             <div className="max-w-md">
                                 <label className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em] mb-4 block">Verification Required</label>
                                 <div className="relative group">
-                                    <input 
-                                        type="password" 
-                                        required
-                                        value={currentPassword}
-                                        onChange={(e) => setCurrentPassword(e.target.value)}
-                                        placeholder="ENTER CURRENT PASSPHRASE TO AUTHORIZE"
-                                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white placeholder:text-white/20 focus:outline-none focus:border-brand-primary/50 transition-all font-mono"
-                                    />
+                                    <div className="relative group/field">
+                                        <input 
+                                            type={showVerifyPassword ? "text" : "password"} 
+                                            required
+                                            value={currentPassword}
+                                            onChange={(e) => setCurrentPassword(e.target.value)}
+                                            placeholder="ENTER CURRENT PASSPHRASE TO AUTHORIZE"
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm font-black text-white placeholder:text-white/20 focus:outline-none focus:border-brand-primary/50 transition-all font-mono pr-14"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowVerifyPassword(!showVerifyPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-brand-primary transition-colors p-2"
+                                        >
+                                            {showVerifyPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
