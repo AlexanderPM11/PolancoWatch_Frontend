@@ -10,7 +10,6 @@ export default function Profile() {
     const [confirmPassword, setConfirmPassword] = useState('');
     
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showVerifyPassword, setShowVerifyPassword] = useState(false);
